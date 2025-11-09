@@ -115,12 +115,19 @@ User: "What drives executive search firm selection?"
 Output: "executive search firm selection criteria"
 
 RULES:
-- Return 2-4 key search terms separated by spaces
-- Include the main topic/concept
-- Include relevant role titles if mentioned (CEO, CHRO, VP, etc.)
-- Include action words (decision, allocation, strategy, trends, etc.)
-- Keep it concise and focused
-- No quotes or special characters
+- Return 3-6 key search terms separated by spaces
+- BE AGGRESSIVE - include multiple related concepts and synonyms
+- Include the main topic/concept AND related terms
+- Include relevant role titles if mentioned (CEO, CHRO, VP, Director, Chief, Executive, etc.)
+- Include action words (decision, allocation, strategy, trends, approach, process, etc.)
+- Include industry terms and variations
+- Include both formal and informal terms
+- Cast a WIDE NET - better to include more terms than miss relevant content
+
+EXAMPLES OF AGGRESSIVE SEARCH:
+"What do executives think about vendor consolidation?" → "vendor consolidation executive decision strategy procurement sourcing"
+"How do CHROs manage budgets?" → "CHRO budget management allocation spending strategy HR"
+"AI adoption trends" → "AI adoption trends artificial intelligence technology implementation strategy"
 
 Convert this query: "${query}"
 
@@ -241,10 +248,21 @@ Generate **exactly 5 diverse search queries** with this strategy:
 - Employment status: 'former' (find people who left)
 
 **SPECIAL HANDLING:**
-- If query mentions "Big 5" or "executive search firms": Use ["Korn Ferry", "Russell Reynolds", "Heidrick & Struggles", "Spencer Stuart", "Egon Zehnder"]
+- If query mentions "Big 5" or "executive search firms": Use ["Korn Ferry", "Russell Reynolds", "Heidrick & Struggles", "Spencer Stuart", "Egon Zehnder", "Korn Ferry International", "Russell Reynolds Associates"]
 - If query mentions "consulting": Use ["McKinsey", "Bain", "BCG", "Deloitte", "PwC", "EY", "KPMG"]
 - If query mentions "tech giants": Use ["Google", "Microsoft", "Meta", "Amazon", "Apple"]
 - If query mentions "fintech": Use ["Stripe", "Square", "PayPal", "Plaid", "Coinbase"]
+
+**BE EXTREMELY AGGRESSIVE WITH ROLE KEYWORDS:**
+- Include ALL possible variations: "VP", "Vice President", "Director", "Senior Director", "Managing Director", "Chief", "Head", "Lead", "Senior", "Principal", "Manager", "Senior Manager"
+- For executive search firms specifically: "Partner", "Principal", "Managing Director", "Executive Recruiter", "Senior Associate", "Associate", "Consultant", "Senior Consultant", "Practice Leader"
+- For any industry: Include functional titles like "Engineering", "Product", "Sales", "Marketing", "Operations", "Finance", "Strategy", "Business Development"
+- Cast a WIDE NET - better to include too many role keywords than too few
+
+**BE AGGRESSIVE WITH COMPANY VARIATIONS:**
+- Include full legal names, shortened names, and common variations
+- For each company, include 2-3 name variations
+- Include subsidiary and division names where relevant
 
 Generate searches for: "${fullQuery}"
 
