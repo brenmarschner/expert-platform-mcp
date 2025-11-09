@@ -865,6 +865,30 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
   });
 });
 
+// MCP endpoints for ChatGPT connector
+app.get('/mcp', async (req, res) => {
+  try {
+    const transport = new SSEServerTransport('/mcp', res);
+    await mcpServer.connect(transport);
+    console.log(`✅ MCP SSE connection established`);
+  } catch (error) {
+    console.error('Failed to set up MCP SSE:', error);
+    res.status(500).json({ error: 'Failed to establish MCP connection' });
+  }
+});
+
+// Handle MCP POST messages
+app.post('/mcp', async (req, res) => {
+  try {
+    // This would handle incoming MCP messages
+    console.log('MCP POST request received:', req.body);
+    res.json({ status: 'received' });
+  } catch (error) {
+    console.error('MCP POST error:', error);
+    res.status(500).json({ error: 'MCP message handling failed' });
+  }
+});
+
 // 404 handler
 app.use((req: express.Request, res: express.Response) => {
   res.status(404).json({
@@ -894,31 +918,6 @@ const server = app.listen(PORT, async () => {
   console.log(`   - POST /api/requests/expert-sourcing - Request expert sourcing`);
   console.log(`   - POST /api/requests/launch-interview - Launch interview request`);
   console.log(`🤖 MCP Tools: search (expert insights), fetch (expert profiles)`);
-  
-  // Set up MCP SSE endpoint for ChatGPT connector
-  app.get('/mcp', async (req, res) => {
-    try {
-      const transport = new SSEServerTransport('/mcp', res);
-      await mcpServer.connect(transport);
-      console.log(`✅ MCP SSE connection established`);
-    } catch (error) {
-      console.error('Failed to set up MCP SSE:', error);
-      res.status(500).json({ error: 'Failed to establish MCP connection' });
-    }
-  });
-
-  // Handle MCP POST messages
-  app.post('/mcp', async (req, res) => {
-    try {
-      // This would handle incoming MCP messages
-      console.log('MCP POST request received:', req.body);
-      res.json({ status: 'received' });
-    } catch (error) {
-      console.error('MCP POST error:', error);
-      res.status(500).json({ error: 'MCP message handling failed' });
-    }
-  });
-  
   console.log(`✅ MCP endpoints configured at /mcp`);
 });
 
