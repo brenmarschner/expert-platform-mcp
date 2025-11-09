@@ -6,11 +6,18 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+} from '@modelcontextprotocol/sdk/types.js';
 
 // Import existing tool handlers
 import { handleInterviewTool } from './tools/interviews.js';
 import { handleExpertTool } from './tools/experts.js';
 import { handleRequestTool } from './tools/requests.js';
+import { SupabaseService } from './services/supabase.js';
 
 // Environment validation
 try {
@@ -22,6 +29,150 @@ try {
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Initialize services
+const supabaseService = new SupabaseService();
+
+// Create MCP server for ChatGPT connector
+const mcpServer = new Server(
+  {
+    name: 'expert-platform-mcp',
+    version: '1.0.0',
+  },
+  {
+    capabilities: {
+      tools: {},
+    },
+  }
+);
+
+// Define required MCP tools for ChatGPT
+const mcpTools = [
+  {
+    name: 'search',
+    description: 'Search expert interviews for insights on any topic. Returns actual expert responses with credibility scores.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'What you want to find expert insights about (e.g., "vendor consolidation", "budget allocation", "AI trends")',
+        },
+        expertName: {
+          type: 'string',
+          description: 'Filter by specific expert name',
+        },
+        minCredibilityScore: {
+          type: 'number',
+          description: 'Minimum credibility score (0-10) to filter high-quality responses',
+          minimum: 0,
+          maximum: 10,
+        },
+        limit: {
+          type: 'number',
+          description: 'Number of results to return',
+          default: 10,
+          minimum: 1,
+          maximum: 50,
+        },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'fetch',
+    description: 'Get detailed expert profile and background information by expert ID or name.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        expertId: {
+          type: 'string',
+          description: 'Expert UUID to fetch detailed profile',
+        },
+        expertName: {
+          type: 'string',
+          description: 'Expert name to search and fetch profile',
+        },
+      },
+    },
+  },
+];
+
+// Handle MCP tool listing
+mcpServer.setRequestHandler(ListToolsRequestSchema, async () => {
+  return {
+    tools: mcpTools,
+  };
+});
+
+// Handle MCP tool calls
+mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
+  const { name, arguments: args } = request.params;
+
+  try {
+    switch (name) {
+      case 'search': {
+        // Map to interview search for expert insights
+        const searchParams = {
+          questionTopic: args?.query,
+          expertName: args?.expertName,
+          minCredibilityScore: args?.minCredibilityScore,
+          limit: args?.limit || 10,
+        };
+        
+        const result = await handleInterviewTool('search_interviews', searchParams);
+        return result;
+      }
+
+      case 'fetch': {
+        // Handle expert profile fetching
+        if (args?.expertId) {
+          const result = await handleExpertTool('get_expert_profile', { expertId: args.expertId });
+          return result;
+        } else if (args?.expertName) {
+          // Search for expert by name first, then get profile
+          const searchResult = await handleExpertTool('search_experts', { 
+            query: args.expertName, 
+            limit: 1 
+          });
+          
+          if (searchResult.content && searchResult.content[0]) {
+            const searchData = JSON.parse(searchResult.content[0].text);
+            if (searchData.data && searchData.data.experts && searchData.data.experts.length > 0) {
+              const expertId = searchData.data.experts[0].id;
+              const result = await handleExpertTool('get_expert_profile', { expertId });
+              return result;
+            }
+          }
+          
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Expert "${args?.expertName}" not found.`,
+              },
+            ],
+          };
+        } else {
+          throw new Error('Either expertId or expertName is required');
+        }
+      }
+
+      default:
+        throw new Error(`Unknown MCP tool: ${name}`);
+    }
+  } catch (error) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Error executing ${name}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        },
+      ],
+      isError: true,
+    };
+  }
+});
 
 // Middleware
 app.use(helmet());
@@ -724,9 +875,10 @@ app.use((req: express.Request, res: express.Response) => {
 });
 
 // Start server
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, async () => {
   console.log(`🚀 Expert Platform API Server running on port ${PORT}`);
   console.log(`📚 API Documentation available at http://localhost:${PORT}/api-docs`);
+  console.log(`🔗 MCP Connector available at http://localhost:${PORT}/mcp`);
   console.log(`🔍 Available endpoints:`);
   console.log(`   - GET  /health - Health check`);
   console.log(`   - POST /api/interviews/search - Search interviews`);
@@ -741,6 +893,33 @@ const server = app.listen(PORT, () => {
   console.log(`   - POST /api/requests/generate-questions - Generate questions`);
   console.log(`   - POST /api/requests/expert-sourcing - Request expert sourcing`);
   console.log(`   - POST /api/requests/launch-interview - Launch interview request`);
+  console.log(`🤖 MCP Tools: search (expert insights), fetch (expert profiles)`);
+  
+  // Set up MCP SSE endpoint for ChatGPT connector
+  app.get('/mcp', async (req, res) => {
+    try {
+      const transport = new SSEServerTransport('/mcp', res);
+      await mcpServer.connect(transport);
+      console.log(`✅ MCP SSE connection established`);
+    } catch (error) {
+      console.error('Failed to set up MCP SSE:', error);
+      res.status(500).json({ error: 'Failed to establish MCP connection' });
+    }
+  });
+
+  // Handle MCP POST messages
+  app.post('/mcp', async (req, res) => {
+    try {
+      // This would handle incoming MCP messages
+      console.log('MCP POST request received:', req.body);
+      res.json({ status: 'received' });
+    } catch (error) {
+      console.error('MCP POST error:', error);
+      res.status(500).json({ error: 'MCP message handling failed' });
+    }
+  });
+  
+  console.log(`✅ MCP endpoints configured at /mcp`);
 });
 
 // Graceful shutdown
