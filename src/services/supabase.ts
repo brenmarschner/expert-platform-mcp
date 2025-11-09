@@ -87,18 +87,34 @@ export class SupabaseService {
   }
 
   async searchExperts(params: ExpertSearchInput): Promise<Expert[]> {
-    // Convert search parameters to match the actual Supabase function
-    const companies = params.currentCompany ? [params.currentCompany] : [];
-    const roleKeywords = params.currentTitle ? [params.currentTitle] : 
-                        params.query ? params.query.split(' ').filter(word => word.length > 2) : [];
-    
-    const { data, error } = await this.expertsClient
-      .rpc('search_experts_company_role', {
-        p_companies: companies,
-        p_role_keywords: roleKeywords,
-        p_employment_status: 'any',
-        p_limit: params.limit || 10
-      });
+    // Since there are no functions, do direct table search
+    let query = this.expertsClient
+      .from('experts')
+      .select('*');
+
+    // Apply filters
+    if (params.currentCompany) {
+      query = query.ilike('current_company', `%${params.currentCompany}%`);
+    }
+
+    if (params.currentTitle) {
+      query = query.ilike('current_title', `%${params.currentTitle}%`);
+    }
+
+    if (params.location) {
+      query = query.ilike('location', `%${params.location}%`);
+    }
+
+    if (params.query) {
+      // Search across multiple fields for the general query
+      query = query.or(`current_company.ilike.%${params.query}%,current_title.ilike.%${params.query}%,background_summary.ilike.%${params.query}%,searchable_text.ilike.%${params.query}%`);
+    }
+
+    query = query
+      .order('created_at', { ascending: false })
+      .limit(params.limit || 10);
+
+    const { data, error } = await query;
 
     if (error) {
       throw new Error(`Failed to search experts: ${error.message}`);
