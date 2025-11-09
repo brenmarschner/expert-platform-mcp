@@ -254,6 +254,158 @@ export async function handleInterviewTool(name: string, arguments_: any): Promis
         };
       }
 
+      case 'synthesize_interviews': {
+        // New AI-powered synthesis tool
+        const params = {
+          questionTopic: arguments_.query,
+          minCredibilityScore: arguments_.minCredibilityScore || 7,
+          limit: arguments_.limit || 20
+        };
+        
+        const interviews = await supabase.searchInterviews(params);
+        
+        if (interviews.length === 0) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  topic: arguments_.query,
+                  synthesis: 'No expert interviews found on this topic. Try broader search terms or lower the credibility threshold.',
+                  interviews_analyzed: 0
+                }, null, 2)
+              }
+            ]
+          };
+        }
+
+        // Use Claude to synthesize the insights
+        const anthropicKey = process.env.ANTHROPIC_API_KEY;
+        if (!anthropicKey) {
+          // Fallback: return structured data without AI synthesis
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  topic: arguments_.query,
+                  interviews_analyzed: interviews.length,
+                  experts: interviews.map(i => ({
+                    expert: i.expert_name,
+                    insight: i.answer_summary,
+                    credibility: i.credibility_score
+                  }))
+                }, null, 2)
+              }
+            ]
+          };
+        }
+
+        // Prepare expert insights for synthesis
+        const expertInsights = interviews.map(interview => ({
+          expert: interview.expert_name,
+          credentials: interview.expert_profile,
+          question: interview.question_text,
+          answer: interview.answer_summary,
+          credibility_score: interview.credibility_score,
+          consensus_score: interview.consensus_score
+        }));
+
+        const synthesisPrompt = `You are an expert investment analyst synthesizing expert interview insights for due diligence research.
+
+TASK: Analyze these expert interviews and provide a comprehensive synthesis on: "${arguments_.query}"
+
+EXPERT INTERVIEWS:
+${JSON.stringify(expertInsights, null, 2)}
+
+SYNTHESIS REQUIREMENTS:
+
+1. **Key Findings** (3-5 bullet points):
+   - Identify the most important insights across all experts
+   - Weight by credibility scores (higher credibility = more weight)
+   - Focus on actionable findings for investment decisions
+
+2. **Areas of Consensus** (where experts agree):
+   - What do multiple experts agree on?
+   - How strong is the consensus?
+   - What validates this consensus?
+
+3. **Areas of Disagreement** (differing perspectives):
+   - Where do experts disagree or have different views?
+   - What drives these differences?
+   - Which perspective is more credible?
+
+4. **Credibility Assessment**:
+   - Average credibility: ${(interviews.reduce((sum, i) => sum + (i.credibility_score || 0), 0) / interviews.length).toFixed(1)}/10
+   - Number of experts: ${interviews.length}
+   - Quality assessment of the overall findings
+
+5. **Investment Implications**:
+   - What should investors know based on these insights?
+   - Key risks or opportunities identified
+   - Confidence level in findings
+
+Return a well-structured analysis in markdown format.`;
+
+        try {
+          const response = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': anthropicKey,
+              'anthropic-version': '2023-06-01'
+            },
+            body: JSON.stringify({
+              model: 'claude-sonnet-4-5',
+              max_tokens: 4000,
+              messages: [{ role: 'user', content: synthesisPrompt }]
+            })
+          });
+
+          if (response.ok) {
+            const aiResult = await response.json();
+            const synthesis = aiResult.content[0].text;
+
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify({
+                    topic: arguments_.query,
+                    interviews_analyzed: interviews.length,
+                    experts_consulted: [...new Set(interviews.map(i => i.expert_name))].length,
+                    avg_credibility: (interviews.reduce((sum, i) => sum + (i.credibility_score || 0), 0) / interviews.length).toFixed(1),
+                    synthesis,
+                    source_interviews: expertInsights.map(i => ({
+                      expert: i.expert,
+                      insight: i.answer,
+                      credibility: i.credibility_score
+                    }))
+                  }, null, 2)
+                }
+              ]
+            };
+          }
+        } catch (error) {
+          console.error('AI synthesis failed:', error);
+        }
+
+        // Fallback if AI fails
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                topic: arguments_.query,
+                interviews_analyzed: interviews.length,
+                experts: expertInsights,
+                note: 'AI synthesis unavailable, showing raw expert insights'
+              }, null, 2)
+            }
+          ]
+        };
+      }
+
       case 'get_interview_insights': {
         const params = InterviewSearchSchema.parse(arguments_);
         const insights = await supabase.getInterviewInsights(params);
