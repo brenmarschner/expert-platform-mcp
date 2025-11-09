@@ -903,7 +903,23 @@ app.post('/mcp', async (req, res) => {
     // Handle MCP JSON-RPC requests
     const { method, params, id } = req.body;
     
-    if (method === 'tools/list') {
+    if (method === 'initialize') {
+      // Required MCP handshake method
+      res.json({
+        jsonrpc: '2.0',
+        id,
+        result: {
+          protocolVersion: '2024-11-05',
+          capabilities: {
+            tools: {}
+          },
+          serverInfo: {
+            name: 'expert-platform-mcp',
+            version: '1.0.0'
+          }
+        }
+      });
+    } else if (method === 'tools/list') {
       // Return available tools
       res.json({
         jsonrpc: '2.0',
