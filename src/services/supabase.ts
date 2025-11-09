@@ -40,11 +40,38 @@ export class SupabaseService {
     }
 
     if (params.questionTopic) {
-      // Use AI agent to improve search terms for better results
-      const enhancedSearchTerms = await this.generateInsightSearchQuery(params.questionTopic);
+      let searchTerms = params.questionTopic;
+      
+      try {
+        // Try AI agent first
+        searchTerms = await this.generateInsightSearchQuery(params.questionTopic);
+        console.log(`AI insights agent converted: "${params.questionTopic}" → "${searchTerms}"`);
+      } catch (error) {
+        console.warn('AI insights agent failed, using original query:', error);
+        searchTerms = params.questionTopic;
+      }
+      
+      // If AI agent returns empty or very short result, use original + enhanced terms
+      if (!searchTerms || searchTerms.length < 5) {
+        const queryLower = params.questionTopic.toLowerCase();
+        const additionalTerms: string[] = [];
+        
+        if (queryLower.includes('vendor') || queryLower.includes('consolidat')) {
+          additionalTerms.push('vendor', 'consolidation', 'procurement', 'sourcing', 'supplier');
+        }
+        if (queryLower.includes('budget') || queryLower.includes('allocat')) {
+          additionalTerms.push('budget', 'allocation', 'spending', 'investment', 'cost');
+        }
+        if (queryLower.includes('executive search') || queryLower.includes('recruiting')) {
+          additionalTerms.push('executive search', 'recruiting', 'hiring', 'talent', 'search firm');
+        }
+        
+        searchTerms = `${params.questionTopic} ${additionalTerms.join(' ')}`.trim();
+        console.log(`Enhanced search terms: "${searchTerms}"`);
+      }
       
       // Sanitize the search term to prevent SQL injection and parsing errors
-      const sanitizedTopic = enhancedSearchTerms.replace(/[;'"\\]/g, ' ').trim();
+      const sanitizedTopic = searchTerms.replace(/[;'"\\]/g, ' ').trim();
       query = query.or(`question_text.ilike.%${sanitizedTopic}%,answer_summary.ilike.%${sanitizedTopic}%`);
     }
 
