@@ -74,6 +74,20 @@ export class SupabaseService {
     return data || [];
   }
 
+  async getFullInterview(meetingId: string): Promise<InterviewMessage[]> {
+    const { data, error } = await this.interviewsClient
+      .from('interview_messages')
+      .select('*')
+      .eq('meeting_id', meetingId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      throw new Error(`Failed to get full interview: ${error.message}`);
+    }
+
+    return data || [];
+  }
+
   private async generateSearchQueries(query: string, currentCompany?: string, currentTitle?: string): Promise<Array<{
     companies: string[];
     role_keywords: string[];

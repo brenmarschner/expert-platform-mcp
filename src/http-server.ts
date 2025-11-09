@@ -160,6 +160,20 @@ const mcpTools = [
       },
     },
   },
+  {
+    name: 'get_full_interview',
+    description: 'Get complete interview transcript and summary by meeting ID. Returns all questions and answers from a single interview session with expert profile.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        meetingId: {
+          type: 'string',
+          description: 'The meeting ID of the interview to retrieve (e.g., "98302656417")',
+        },
+      },
+      required: ['meetingId'],
+    },
+  },
 ];
 
 // Handle MCP tool listing
@@ -1053,6 +1067,14 @@ app.post('/mcp', async (req, res) => {
             } else {
               throw new Error('Either expertId or expertName is required');
             }
+            break;
+          }
+          case 'get_full_interview': {
+            const meetingId = args?.meetingId;
+            if (!meetingId) {
+              throw new Error('meetingId is required');
+            }
+            result = await handleInterviewTool('get_full_interview', { meetingId });
             break;
           }
           default:
