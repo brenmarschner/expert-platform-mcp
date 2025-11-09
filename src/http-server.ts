@@ -50,13 +50,13 @@ const mcpServer = new Server(
 const mcpTools = [
   {
     name: 'search_insights',
-    description: 'Search expert interviews for insights and opinions on any topic. Returns actual expert quotes with full profiles and credibility scores. Works with natural language queries about business topics, trends, strategies, and decisions.',
+    description: 'Search expert interviews for investment diligence insights. Find expert opinions on market dynamics, competitive positioning, business strategy, operational challenges, and industry trends. Returns actual expert quotes with credibility scores.',
     inputSchema: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
-          description: 'Natural language query about what insights you want to find. Examples: "What do executives think about vendor consolidation?", "How do CHROs allocate budgets?", "What are the trends in executive search?", "How do companies decide on insourcing vs outsourcing?"',
+          description: 'Investment diligence question about business strategy, market trends, competitive dynamics, or operational challenges. Examples: "competitive dynamics in fintech", "pricing strategy challenges", "market consolidation trends", "technology adoption barriers"',
         },
         expertName: {
           type: 'string',
@@ -81,13 +81,13 @@ const mcpTools = [
   },
   {
     name: 'search_experts',
-    description: 'Find experts by company and role using AI-powered strategic search. Works best with specific companies and job titles. For Big 5 executive search firms use: Korn Ferry, Russell Reynolds, Heidrick & Struggles, Spencer Stuart, Egon Zehnder. For tech companies use: Google, Microsoft, Meta, Amazon, Apple, etc.',
+    description: 'Find current and former employees of specific companies by role. Optimized for sourcing experts with experience at target companies for interviews and research. Uses AI to map queries to company + role combinations.',
     inputSchema: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
-          description: 'Natural language description of experts to find. Examples: "executives from Big 5 search firms", "fintech leaders at Stripe or Square", "AI engineers at Google", "healthcare executives", "VPs at consulting firms". The AI agent will convert this to strategic company/role searches.',
+          description: 'Description of experts to find, focusing on company + role combinations. Examples: "former Google product managers", "current Stripe executives", "McKinsey consultants", "healthcare startup founders", "enterprise sales leaders at Salesforce"',
         },
         currentCompany: {
           type: 'string',

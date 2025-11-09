@@ -119,44 +119,46 @@ export class SupabaseService {
   }
 
   private async generateInsightSearchQuery(query: string): Promise<string> {
-    // Create an AI agent to convert natural language to effective interview search terms
-    const prompt = `You are an expert at converting natural language queries into effective search terms for finding expert interview insights.
+    // AI agent optimized for investment diligence research queries
+    const prompt = `You are an expert at converting investment diligence questions into effective search terms for finding expert interview insights.
 
-Your task: Convert the user's natural language query into 2-3 focused search terms that will find relevant expert interviews.
+FOCUS: Investment diligence research - market dynamics, competitive landscape, business strategy, operational challenges, growth drivers, risks, and industry trends.
 
-EXAMPLES:
+Your task: Convert the user's diligence question into 3-5 focused search terms that will find relevant expert insights.
 
-User: "What do executives think about vendor consolidation?"
-Output: "vendor consolidation executive decision"
+INVESTMENT DILIGENCE EXAMPLES:
 
-User: "How do CHROs allocate executive search budgets?"  
-Output: "budget allocation executive search CHRO"
+User: "What are the competitive dynamics in the fintech payments space?"
+Output: "competitive dynamics fintech payments market"
 
-User: "What are trends in AI adoption?"
-Output: "AI adoption trends technology"
+User: "How do companies evaluate build vs buy decisions for AI?"
+Output: "build buy decision AI technology strategy"
 
-User: "How do companies decide on insourcing vs outsourcing?"
-Output: "insourcing outsourcing decision strategy"
+User: "What are the key risks in SaaS customer acquisition?"
+Output: "SaaS customer acquisition risks challenges"
 
-User: "What drives executive search firm selection?"
-Output: "executive search firm selection criteria"
+User: "How do executives think about pricing strategy in B2B software?"
+Output: "pricing strategy B2B software executive"
 
-RULES:
-- Return 3-6 key search terms separated by spaces
-- BE AGGRESSIVE - include multiple related concepts and synonyms
-- Include the main topic/concept AND related terms
-- Include relevant role titles if mentioned (CEO, CHRO, VP, Director, Chief, Executive, etc.)
-- Include action words (decision, allocation, strategy, trends, approach, process, etc.)
-- Include industry terms and variations
-- Include both formal and informal terms
-- Cast a WIDE NET - better to include more terms than miss relevant content
+User: "What drives vendor selection in enterprise security?"
+Output: "vendor selection enterprise security procurement"
 
-EXAMPLES OF AGGRESSIVE SEARCH:
-"What do executives think about vendor consolidation?" → "vendor consolidation executive decision strategy procurement sourcing"
-"How do CHROs manage budgets?" → "CHRO budget management allocation spending strategy HR"
-"AI adoption trends" → "AI adoption trends artificial intelligence technology implementation strategy"
+User: "How do companies approach digital transformation initiatives?"
+Output: "digital transformation strategy implementation"
 
-Convert this query: "${query}"
+User: "What are the growth challenges in healthcare technology?"
+Output: "growth challenges healthcare technology"
+
+RULES FOR DILIGENCE RESEARCH:
+- Focus on business strategy, market dynamics, competitive positioning
+- Include decision-making processes and evaluation criteria  
+- Include risk factors, challenges, and growth drivers
+- Include market trends, disruption, and industry evolution
+- Include operational aspects like pricing, go-to-market, customer acquisition
+- Use business terminology that executives would discuss
+- Return 3-5 key terms separated by spaces
+
+Convert this diligence query: "${query}"
 
 Return only the search terms, nothing else.`;
 
@@ -247,31 +249,33 @@ The system searches LinkedIn profiles based on:
 
 ## YOUR TASK
 
-Generate **exactly 5 diverse search queries** with this strategy:
+FOCUS: Finding current and former employees of specific companies with relevant role experience.
 
-**Search 1: Broad company list, specific senior roles**
-- 4-5 major companies from the industry
-- 1-2 senior role keywords (VP, Director, Chief)
+Generate **exactly 5 diverse search queries** optimized for company + role targeting:
+
+**Search 1: Target companies, broad seniority levels**
+- 3-4 most relevant companies from the query
+- Wide range of seniority: VP, Director, Senior Director, Managing Director, Head, Lead, Senior, Principal
 - Employment status: 'any'
 
-**Search 2: Top companies, broad roles**
+**Search 2: Target companies, specific functional roles**
 - 2-3 most relevant companies
-- 2-3 related role keywords
+- Functional role keywords based on query context
 - Employment status: 'current'
 
-**Search 3: Company name variations, specific seniority**
-- 2-4 companies with name variations (e.g., "Intel", "Intel Corporation", "Intel Foundry")
-- Seniority keywords (VP, Director, Chief)
+**Search 3: Company variations and subsidiaries**
+- Include company name variations, subsidiaries, former names
+- Executive-level roles: Chief, VP, C-level, President
 - Employment status: 'current'
 
-**Search 4: Secondary/niche companies, functional roles**
-- 2-3 smaller or adjacent companies
-- 2-3 functional keywords
+**Search 4: Adjacent/competitor companies**
+- 2-3 competitor or related companies in same industry
+- Mid-level roles: Manager, Senior Manager, Director
 - Employment status: 'any'
 
-**Search 5: Competitor companies, executive level**
-- 2-3 competitor companies
-- Executive-level keywords only (Chief, VP, C-level)
+**Search 5: Former employees strategy**
+- Same target companies as Search 1
+- Senior roles only: VP, Director, Chief, Head
 - Employment status: 'former' (find people who left)
 
 **SPECIAL HANDLING:**
