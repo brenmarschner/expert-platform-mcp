@@ -1,0 +1,18 @@
+# Expert Platform MCP Server Environment Configuration
+
+# Supabase Configuration for Interview Data (Required)
+SUPABASE_INTERVIEWS_URL=https://your-interviews-project.supabase.co
+SUPABASE_INTERVIEWS_SERVICE_ROLE_KEY=your_interviews_service_role_key_here
+
+# Supabase Configuration for Expert Data (Required) 
+SUPABASE_EXPERTS_URL=https://your-experts-project.supabase.co
+SUPABASE_EXPERTS_SERVICE_ROLE_KEY=your_experts_service_role_key_here
+
+# Slack Integration (Required)
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/your/webhook/url
+
+# Anthropic API for AI-powered features (Optional but recommended)
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+
+# Alternative: OpenAI API (if you prefer OpenAI over Anthropic)
+# OPENAI_API_KEY=your_openai_api_key_here

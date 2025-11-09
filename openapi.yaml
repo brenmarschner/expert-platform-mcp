@@ -1,0 +1,669 @@
+openapi: 3.0.0
+info:
+  title: Expert Platform API
+  version: 1.0.0
+  description: API for expert interview management and discovery
+  contact:
+    name: Expert Platform Team
+servers:
+  - url: https://your-render-app.onrender.com
+    description: Production server
+  - url: http://localhost:3000
+    description: Development server
+
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      operationId: healthCheck
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  timestamp:
+                    type: string
+                    format: date-time
+                  version:
+                    type: string
+                    example: "1.0.0"
+
+  /api/interviews/search:
+    post:
+      summary: Search interview messages
+      operationId: searchInterviews
+      description: Search and filter interview messages from past expert interviews
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expertName:
+                  type: string
+                  description: Filter by expert name (partial match supported)
+                projectId:
+                  type: number
+                  description: Filter by specific project ID
+                questionTopic:
+                  type: string
+                  description: Search for interviews containing questions or answers about this topic
+                dateFrom:
+                  type: string
+                  format: date
+                  description: Filter interviews from this date (ISO format YYYY-MM-DD)
+                dateTo:
+                  type: string
+                  format: date
+                  description: Filter interviews to this date (ISO format YYYY-MM-DD)
+                minConsensusScore:
+                  type: number
+                  minimum: 0
+                  maximum: 10
+                  description: Minimum consensus score (0-10)
+                minCredibilityScore:
+                  type: number
+                  minimum: 0
+                  maximum: 10
+                  description: Minimum credibility score (0-10)
+                limit:
+                  type: number
+                  minimum: 1
+                  maximum: 100
+                  default: 20
+                  description: Maximum number of results to return
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      total_results:
+                        type: number
+                      interviews:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/InterviewMessage'
+                  tool:
+                    type: string
+
+  /api/interviews/summarize:
+    post:
+      summary: Summarize interviews
+      operationId: summarizeInterviews
+      description: Generate comprehensive summaries of interview data
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expertName:
+                  type: string
+                  description: Summarize interviews from this expert
+                projectId:
+                  type: number
+                  description: Summarize interviews from this project
+                questionTopic:
+                  type: string
+                  description: Summarize interviews about this topic
+                dateFrom:
+                  type: string
+                  format: date
+                  description: Include interviews from this date onwards
+                dateTo:
+                  type: string
+                  format: date
+                  description: Include interviews up to this date
+                focusArea:
+                  type: string
+                  description: What aspect to focus the summary on (e.g. "technical challenges", "market trends")
+      responses:
+        '200':
+          description: Interview summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/interviews/insights:
+    post:
+      summary: Get interview insights
+      operationId: getInterviewInsights
+      description: Get statistical insights and quality metrics from interview data
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expertName:
+                  type: string
+                  description: Analyze insights for this expert
+                projectId:
+                  type: number
+                  description: Analyze insights for this project
+                questionTopic:
+                  type: string
+                  description: Analyze insights about this topic
+                dateFrom:
+                  type: string
+                  format: date
+                  description: Include interviews from this date onwards
+                dateTo:
+                  type: string
+                  format: date
+                  description: Include interviews up to this date
+      responses:
+        '200':
+          description: Interview insights and metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/interviews/expert-history/{expertId}:
+    get:
+      summary: Get expert interview history
+      operationId: getExpertInterviewHistory
+      description: Get complete interview history for a specific expert
+      parameters:
+        - name: expertId
+          in: path
+          required: true
+          schema:
+            type: number
+          description: The expert ID
+      responses:
+        '200':
+          description: Expert interview history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/experts/search:
+    post:
+      summary: Search experts
+      operationId: searchExperts
+      description: Search for experts using the existing expert database
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+              properties:
+                query:
+                  type: string
+                  description: Search query for expert skills, experience, or background
+                  example: "fintech payments"
+                currentCompany:
+                  type: string
+                  description: Filter by current company name
+                  example: "Stripe"
+                currentTitle:
+                  type: string
+                  description: Filter by current job title
+                  example: "Head of Payments"
+                location:
+                  type: string
+                  description: Filter by location
+                  example: "San Francisco"
+                limit:
+                  type: number
+                  minimum: 1
+                  maximum: 50
+                  default: 10
+                  description: Maximum number of results to return
+      responses:
+        '200':
+          description: Expert search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      total_results:
+                        type: number
+                      search_query:
+                        type: string
+                      experts:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Expert'
+                  tool:
+                    type: string
+
+  /api/experts/profile/{expertId}:
+    get:
+      summary: Get expert profile
+      operationId: getExpertProfile
+      description: Get detailed profile information for a specific expert
+      parameters:
+        - name: expertId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The expert UUID
+      responses:
+        '200':
+          description: Expert profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/experts/availability:
+    post:
+      summary: Check expert availability
+      operationId: checkExpertAvailability
+      description: Check the availability and scheduling status of experts
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expertIds:
+                  type: array
+                  items:
+                    type: string
+                  description: Array of expert UUIDs to check availability for
+                state:
+                  type: string
+                  enum: [vetting, ready_to_schedule, scheduled, completed, disqualified]
+                  description: Filter experts by their current state
+      responses:
+        '200':
+          description: Expert availability information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/experts/analyze-pool:
+    post:
+      summary: Analyze expert pool
+      operationId: analyzeExpertPool
+      description: Analyze the available expert pool for patterns, skills distribution, and availability trends
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                focusArea:
+                  type: string
+                  description: Focus the analysis on a specific area (e.g. "fintech", "AI/ML", "healthcare")
+                  example: "fintech"
+                includeMetrics:
+                  type: boolean
+                  default: true
+                  description: Include performance metrics from past interviews
+      responses:
+        '200':
+          description: Expert pool analysis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/requests/create-guide:
+    post:
+      summary: Create interview guide
+      operationId: createInterviewGuide
+      description: Create a structured interview guide with questions categorized by type and priority. This will also trigger a Slack notification to the internal team.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - description
+                - questions
+                - expertCriteria
+              properties:
+                title:
+                  type: string
+                  description: Title of the interview guide
+                  example: "Fintech Payment Processing Deep Dive"
+                description:
+                  type: string
+                  description: Description of what this interview aims to discover
+                  example: "Understanding current challenges and innovations in payment processing"
+                questions:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/InterviewQuestion'
+                expertCriteria:
+                  $ref: '#/components/schemas/ExpertCriteria'
+                requestedBy:
+                  type: string
+                  default: "MCP User"
+                  description: Name or identifier of the person requesting the interview
+      responses:
+        '200':
+          description: Interview guide created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/requests/generate-questions:
+    post:
+      summary: Generate interview questions
+      operationId: generateInterviewQuestions
+      description: Generate suggested interview questions based on a topic or research area. Use this to help build interview guides.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - topic
+              properties:
+                topic:
+                  type: string
+                  description: The main topic or research area for the interview
+                  example: "fintech regulatory challenges"
+                expertBackground:
+                  type: string
+                  description: Background of the type of expert you want to interview
+                  example: "fintech executive"
+                focusAreas:
+                  type: array
+                  items:
+                    type: string
+                  description: Specific areas to focus on within the topic
+                  example: ["compliance", "regulations", "risk management"]
+                questionCount:
+                  type: number
+                  minimum: 5
+                  maximum: 25
+                  default: 10
+                  description: Number of questions to generate
+                difficulty:
+                  type: string
+                  enum: [beginner, intermediate, advanced]
+                  default: intermediate
+                  description: Difficulty level of questions
+      responses:
+        '200':
+          description: Generated interview questions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/requests/expert-sourcing:
+    post:
+      summary: Request expert sourcing
+      operationId: requestExpertSourcing
+      description: Create a request for sourcing new experts that match specific criteria. This will notify the internal team via Slack.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - requestTitle
+                - description
+                - expertCriteria
+              properties:
+                requestTitle:
+                  type: string
+                  description: Title of the expert sourcing request
+                  example: "Need Fintech Payment Processing Expert"
+                description:
+                  type: string
+                  description: Detailed description of what type of expert is needed and why
+                  example: "Looking for a senior expert with deep knowledge of payment processing systems for regulatory compliance research"
+                expertCriteria:
+                  $ref: '#/components/schemas/ExpertCriteria'
+                urgency:
+                  type: string
+                  enum: [low, medium, high]
+                  default: medium
+                  description: Urgency level of the request
+                budget:
+                  type: number
+                  description: Budget range for the expert (optional)
+                timeline:
+                  type: string
+                  description: When the expert is needed (e.g. "within 2 weeks", "by end of month")
+                  example: "within 2 weeks"
+                requestedBy:
+                  type: string
+                  default: "MCP User"
+                  description: Name or identifier of the person making the request
+      responses:
+        '200':
+          description: Expert sourcing request created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /api/requests/launch-interview:
+    post:
+      summary: Launch interview request
+      operationId: launchInterviewRequest
+      description: Combine an interview guide with expert criteria and launch a complete interview request. This creates the guide and notifies the team in one action.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - interviewGuide
+              properties:
+                interviewGuide:
+                  type: object
+                  required:
+                    - title
+                    - description
+                    - questions
+                    - expertCriteria
+                  properties:
+                    title:
+                      type: string
+                      example: "Fintech Payment Processing Deep Dive"
+                    description:
+                      type: string
+                      example: "Understanding current challenges and innovations in payment processing"
+                    questions:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/InterviewQuestion'
+                    expertCriteria:
+                      $ref: '#/components/schemas/ExpertCriteria'
+                urgency:
+                  type: string
+                  enum: [low, medium, high]
+                  default: medium
+                  description: Urgency level of the interview request
+                requestedBy:
+                  type: string
+                  default: "MCP User"
+                  description: Name or identifier of the person making the request
+      responses:
+        '200':
+          description: Interview request launched successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+components:
+  schemas:
+    ApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          oneOf:
+            - type: object
+            - type: string
+        error:
+          type: string
+        tool:
+          type: string
+
+    InterviewMessage:
+      type: object
+      properties:
+        id:
+          type: number
+        expert_name:
+          type: string
+        question_text:
+          type: string
+        answer_summary:
+          type: string
+        consensus_score:
+          type: number
+          minimum: 0
+          maximum: 10
+        credibility_score:
+          type: number
+          minimum: 0
+          maximum: 10
+        completion_score:
+          type: number
+        created_at:
+          type: string
+          format: date-time
+        project_id:
+          type: number
+
+    Expert:
+      type: object
+      properties:
+        id:
+          type: string
+        full_name:
+          type: string
+        current_company:
+          type: string
+        current_title:
+          type: string
+        location:
+          type: string
+        background_summary:
+          type: string
+        state:
+          type: string
+          enum: [vetting, ready_to_schedule, scheduled, completed, disqualified]
+        linkedin_url:
+          type: string
+        recent_companies:
+          type: array
+          items:
+            type: string
+        recent_titles:
+          type: array
+          items:
+            type: string
+        is_currently_employed:
+          type: boolean
+        qa_passed:
+          type: boolean
+        call_booked:
+          type: boolean
+
+    InterviewQuestion:
+      type: object
+      required:
+        - question
+        - category
+        - priority
+      properties:
+        question:
+          type: string
+          description: The interview question
+          example: "What are the biggest technical challenges in payment processing today?"
+        category:
+          type: string
+          enum: [background, experience, technical, opinion, scenario]
+          description: Category of the question
+        priority:
+          type: string
+          enum: [high, medium, low]
+          description: Priority level of the question
+        followUpSuggestions:
+          type: array
+          items:
+            type: string
+          description: Suggested follow-up questions
+          example: ["Can you provide a specific example?", "How did you measure success?"]
+
+    ExpertCriteria:
+      type: object
+      properties:
+        currentCompany:
+          type: string
+          description: Desired current company of expert
+          example: "Stripe"
+        recentCompanies:
+          type: array
+          items:
+            type: string
+          description: List of recent companies the expert should have worked at
+          example: ["Stripe", "Square", "PayPal"]
+        currentTitle:
+          type: string
+          description: Desired current job title
+          example: "Head of Payments"
+        recentTitles:
+          type: array
+          items:
+            type: string
+          description: List of recent job titles the expert should have held
+          example: ["Head of Payments", "VP of Engineering", "Director of Product"]
+        experienceYears:
+          type: number
+          description: Minimum years of experience required
+          example: 8
+        location:
+          type: string
+          description: Preferred location of the expert
+          example: "San Francisco"
+        industryExperience:
+          type: array
+          items:
+            type: string
+          description: Industry experience areas required
+          example: ["fintech", "payments", "financial services"]

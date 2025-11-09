@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: expert-platform-api
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start:http
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: SUPABASE_INTERVIEWS_URL
+        sync: false
+      - key: SUPABASE_INTERVIEWS_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_EXPERTS_URL
+        sync: false
+      - key: SUPABASE_EXPERTS_SERVICE_ROLE_KEY
+        sync: false
+      - key: SLACK_WEBHOOK_URL
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+    healthCheckPath: /health
