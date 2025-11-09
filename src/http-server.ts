@@ -867,22 +867,133 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 
 // MCP endpoints for ChatGPT connector
 app.get('/mcp', (req, res) => {
-  res.json({
-    protocol: 'mcp',
-    version: '1.0.0',
-    server: 'expert-platform-mcp',
-    tools: ['search', 'fetch'],
-    status: 'ready',
-    message: 'MCP endpoint is working - use SSE for actual protocol connection'
+  // Set up Server-Sent Events for MCP protocol
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Cache-Control'
   });
+
+  // Send initial endpoint event as required by MCP protocol
+  const sessionId = Math.random().toString(36).substring(2, 15);
+  res.write(`event: endpoint\n`);
+  res.write(`data: /mcp?sessionId=${sessionId}\n\n`);
+
+  // Keep connection alive
+  const heartbeat = setInterval(() => {
+    res.write(`event: heartbeat\n`);
+    res.write(`data: ${Date.now()}\n\n`);
+  }, 30000);
+
+  // Handle client disconnect
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    console.log('MCP SSE connection closed');
+  });
+
+  console.log(`✅ MCP SSE connection established with session: ${sessionId}`);
 });
 
-app.post('/mcp', (req, res) => {
-  res.json({
-    status: 'received',
-    message: 'MCP POST endpoint working',
-    body: req.body
-  });
+app.post('/mcp', async (req, res) => {
+  try {
+    console.log('MCP JSON-RPC request:', JSON.stringify(req.body, null, 2));
+    
+    // Handle MCP JSON-RPC requests
+    const { method, params, id } = req.body;
+    
+    if (method === 'tools/list') {
+      // Return available tools
+      res.json({
+        jsonrpc: '2.0',
+        id,
+        result: {
+          tools: mcpTools
+        }
+      });
+    } else if (method === 'tools/call') {
+      // Handle tool calls
+      const { name, arguments: args } = params;
+      
+      try {
+        let result;
+        switch (name) {
+          case 'search': {
+            const searchParams = {
+              questionTopic: args?.query,
+              expertName: args?.expertName,
+              minCredibilityScore: args?.minCredibilityScore,
+              limit: args?.limit || 10,
+            };
+            result = await handleInterviewTool('search_interviews', searchParams);
+            break;
+          }
+          case 'fetch': {
+            if (args?.expertId) {
+              result = await handleExpertTool('get_expert_profile', { expertId: args.expertId });
+            } else if (args?.expertName) {
+              const searchResult = await handleExpertTool('search_experts', { 
+                query: args.expertName, 
+                limit: 1 
+              });
+              
+              if (searchResult.content && searchResult.content[0]) {
+                const searchData = JSON.parse(searchResult.content[0].text);
+                if (searchData.data && searchData.data.experts && searchData.data.experts.length > 0) {
+                  const expertId = searchData.data.experts[0].id;
+                  result = await handleExpertTool('get_expert_profile', { expertId });
+                } else {
+                  result = {
+                    content: [{ type: 'text', text: `Expert "${args.expertName}" not found.` }]
+                  };
+                }
+              }
+            } else {
+              throw new Error('Either expertId or expertName is required');
+            }
+            break;
+          }
+          default:
+            throw new Error(`Unknown tool: ${name}`);
+        }
+        
+        res.json({
+          jsonrpc: '2.0',
+          id,
+          result
+        });
+      } catch (error) {
+        res.json({
+          jsonrpc: '2.0',
+          id,
+          error: {
+            code: -1,
+            message: error instanceof Error ? error.message : 'Unknown error'
+          }
+        });
+      }
+    } else {
+      // Unknown method
+      res.json({
+        jsonrpc: '2.0',
+        id,
+        error: {
+          code: -32601,
+          message: `Method not found: ${method}`
+        }
+      });
+    }
+  } catch (error) {
+    console.error('MCP POST error:', error);
+    res.status(500).json({
+      jsonrpc: '2.0',
+      error: {
+        code: -32603,
+        message: 'Internal error'
+      }
+    });
+  }
 });
 
 // 404 handler
