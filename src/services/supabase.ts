@@ -45,22 +45,26 @@ export class SupabaseService {
       
       // If query is too long (>50 chars), extract key terms
       if (searchTerms.length > 50) {
+        // Remove parenthetical content like (EASM) first
+        searchTerms = searchTerms.replace(/\([^)]*\)/g, ' ');
+        
         // Remove common filler words and extract meaningful terms
-        const fillerWords = ['interviews', 'with', 'customers', 'of', 'the', 'and', 'or', 'about', 'for', 'in', 'on', 'at', 'to', 'from', 'all', 'find', 'search', 'please', 'me'];
-        const words = searchTerms.toLowerCase().split(/[\s,;]+/);
+        const fillerWords = ['interviews', 'with', 'customers', 'of', 'the', 'and', 'or', 'about', 'for', 'in', 'on', 'at', 'to', 'from', 'all', 'find', 'search', 'please', 'me', 'that', 'this', 'what', 'how', 'why', 'software', 'process'];
+        const words = searchTerms.toLowerCase().split(/[\s,;.!?]+/);
         const keyWords = words.filter(word => 
-          word.length > 2 && 
-          !fillerWords.includes(word) &&
-          !/^[\(\)\[\]]+$/.test(word)
+          word.length > 3 && 
+          !fillerWords.includes(word)
         );
         
-        // Take first 3-5 meaningful words
-        searchTerms = keyWords.slice(0, 5).join(' ');
-        console.log(`Extracted key terms from verbose query: "${params.questionTopic}" → "${searchTerms}"`);
+        // Take first 3-4 meaningful words for focused search
+        searchTerms = keyWords.slice(0, 4).join(' ');
+        console.log(`Extracted key terms: "${params.questionTopic}" → "${searchTerms}"`);
       }
       
       // Sanitize the search term to prevent SQL injection
       const sanitizedTopic = searchTerms.replace(/[;'"\\]/g, ' ').trim();
+      
+      // Use OR search for flexibility - matches if ANY term is found
       query = query.or(`question_text.ilike.%${sanitizedTopic}%,answer_summary.ilike.%${sanitizedTopic}%`);
     }
 
