@@ -40,9 +40,10 @@ export class SupabaseService {
     }
 
     if (params.questionTopic) {
-      // TEMPORARILY DISABLE AI AGENT FOR TESTING - use original query
+      // Use original query - skip AI agent for now since direct search works better
+      // TODO: Re-enable AI agent with better prompt once we validate it doesn't break searches
       const searchTerms = params.questionTopic;
-      console.log(`Direct search (AI agent disabled): "${searchTerms}"`);
+      console.log(`Interview search: "${searchTerms}"`);
       
       // Sanitize the search term to prevent SQL injection and parsing errors
       const sanitizedTopic = searchTerms.replace(/[;'"\\]/g, ' ').trim();
