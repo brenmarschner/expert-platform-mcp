@@ -40,13 +40,8 @@ export class SupabaseService {
     }
 
     if (params.questionTopic) {
-      // Use original query - skip AI agent for now since direct search works better
-      // TODO: Re-enable AI agent with better prompt once we validate it doesn't break searches
-      const searchTerms = params.questionTopic;
-      console.log(`Interview search: "${searchTerms}"`);
-      
-      // Sanitize the search term to prevent SQL injection and parsing errors
-      const sanitizedTopic = searchTerms.replace(/[;'"\\]/g, ' ').trim();
+      // Direct search works best - sanitize and search as-is
+      const sanitizedTopic = params.questionTopic.replace(/[;'"\\]/g, ' ').trim();
       query = query.or(`question_text.ilike.%${sanitizedTopic}%,answer_summary.ilike.%${sanitizedTopic}%`);
     }
 
@@ -91,81 +86,6 @@ export class SupabaseService {
     }
 
     return data || [];
-  }
-
-  private async generateInsightSearchQuery(query: string): Promise<string> {
-    // AI agent optimized for investment diligence research queries
-    const prompt = `You are an expert at converting investment diligence questions into effective search terms for finding expert interview insights.
-
-FOCUS: Investment diligence research - market dynamics, competitive landscape, business strategy, operational challenges, growth drivers, risks, and industry trends.
-
-Your task: Convert the user's diligence question into 3-5 focused search terms that will find relevant expert insights.
-
-INVESTMENT DILIGENCE EXAMPLES:
-
-User: "What are the competitive dynamics in the fintech payments space?"
-Output: "competitive dynamics fintech payments market"
-
-User: "How do companies evaluate build vs buy decisions for AI?"
-Output: "build buy decision AI technology strategy"
-
-User: "What are the key risks in SaaS customer acquisition?"
-Output: "SaaS customer acquisition risks challenges"
-
-User: "How do executives think about pricing strategy in B2B software?"
-Output: "pricing strategy B2B software executive"
-
-User: "What drives vendor selection in enterprise security?"
-Output: "vendor selection enterprise security procurement"
-
-User: "How do companies approach digital transformation initiatives?"
-Output: "digital transformation strategy implementation"
-
-User: "What are the growth challenges in healthcare technology?"
-Output: "growth challenges healthcare technology"
-
-RULES FOR DILIGENCE RESEARCH:
-- Focus on business strategy, market dynamics, competitive positioning
-- Include decision-making processes and evaluation criteria  
-- Include risk factors, challenges, and growth drivers
-- Include market trends, disruption, and industry evolution
-- Include operational aspects like pricing, go-to-market, customer acquisition
-- Use business terminology that executives would discuss
-- Return 3-5 key terms separated by spaces
-
-Convert this diligence query: "${query}"
-
-Return only the search terms, nothing else.`;
-
-    try {
-      const anthropicKey = process.env.ANTHROPIC_API_KEY;
-      if (anthropicKey) {
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': anthropicKey,
-            'anthropic-version': '2023-06-01'
-          },
-          body: JSON.stringify({
-            model: 'claude-sonnet-4-5',
-            max_tokens: 150,
-            messages: [{ role: 'user', content: prompt }]
-          })
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          const searchTerms = result.content[0].text.trim();
-          return searchTerms;
-        }
-      }
-    } catch (error) {
-      console.warn('Insights search agent failed, using original query:', error);
-    }
-
-    // Fallback: return original query
-    return query;
   }
 
   private async generateSearchQueries(query: string, currentCompany?: string, currentTitle?: string): Promise<Array<{

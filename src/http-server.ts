@@ -7,7 +7,6 @@ import morgan from 'morgan';
 import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -17,7 +16,6 @@ import {
 import { handleInterviewTool } from './tools/interviews.js';
 import { handleExpertTool } from './tools/experts.js';
 import { handleRequestTool } from './tools/requests.js';
-import { SupabaseService } from './services/supabase.js';
 
 // Environment validation
 try {
@@ -29,9 +27,6 @@ try {
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-// Initialize services
-const supabaseService = new SupabaseService();
 
 // Create MCP server for ChatGPT connector
 const mcpServer = new Server(
@@ -176,81 +171,7 @@ const mcpTools = [
   },
 ];
 
-// Handle MCP tool listing
-mcpServer.setRequestHandler(ListToolsRequestSchema, async () => {
-  return {
-    tools: mcpTools,
-  };
-});
-
-// Handle MCP tool calls
-mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const { name, arguments: args } = request.params;
-
-  try {
-    switch (name) {
-      case 'search': {
-        // Map to interview search for expert insights
-        const searchParams = {
-          questionTopic: args?.query,
-          expertName: args?.expertName,
-          minCredibilityScore: args?.minCredibilityScore,
-          limit: args?.limit || 10,
-        };
-        
-        const result = await handleInterviewTool('search_interviews', searchParams);
-        return result;
-      }
-
-      case 'fetch': {
-        // Handle expert profile fetching
-        if (args?.expertId) {
-          const result = await handleExpertTool('get_expert_profile', { expertId: args.expertId });
-          return result;
-        } else if (args?.expertName) {
-          // Search for expert by name first, then get profile
-          const searchResult = await handleExpertTool('search_experts', { 
-            query: args.expertName, 
-            limit: 1 
-          });
-          
-          if (searchResult.content && searchResult.content[0]) {
-            const searchData = JSON.parse(searchResult.content[0].text);
-            if (searchData.data && searchData.data.experts && searchData.data.experts.length > 0) {
-              const expertId = searchData.data.experts[0].id;
-              const result = await handleExpertTool('get_expert_profile', { expertId });
-              return result;
-            }
-          }
-          
-          return {
-            content: [
-              {
-                type: 'text',
-                text: `Expert "${args?.expertName}" not found.`,
-              },
-            ],
-          };
-        } else {
-          throw new Error('Either expertId or expertName is required');
-        }
-      }
-
-      default:
-        throw new Error(`Unknown MCP tool: ${name}`);
-    }
-  } catch (error) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Error executing ${name}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        },
-      ],
-      isError: true,
-    };
-  }
-});
+// MCP tool handlers are set up below in the POST /mcp endpoint
 
 // Middleware
 app.use(helmet());
@@ -943,35 +864,25 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
   });
 });
 
-// MCP endpoints for ChatGPT connector
+// MCP endpoint for ChatGPT connector - Server-Sent Events (SSE) for MCP protocol
 app.get('/mcp', (req, res) => {
-  // Set up Server-Sent Events for MCP protocol
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     'Connection': 'keep-alive',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Cache-Control'
   });
 
-  // Send initial endpoint event as required by MCP protocol
   const sessionId = Math.random().toString(36).substring(2, 15);
-  res.write(`event: endpoint\n`);
-  res.write(`data: /mcp?sessionId=${sessionId}\n\n`);
+  res.write(`event: endpoint\ndata: /mcp?sessionId=${sessionId}\n\n`);
 
-  // Keep connection alive
   const heartbeat = setInterval(() => {
-    res.write(`event: heartbeat\n`);
-    res.write(`data: ${Date.now()}\n\n`);
+    res.write(`:heartbeat\n\n`);
   }, 30000);
 
-  // Handle client disconnect
   req.on('close', () => {
     clearInterval(heartbeat);
-    console.log('MCP SSE connection closed');
   });
-
-  console.log(`✅ MCP SSE connection established with session: ${sessionId}`);
 });
 
 app.post('/mcp', async (req, res) => {
