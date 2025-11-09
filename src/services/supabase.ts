@@ -87,13 +87,17 @@ export class SupabaseService {
   }
 
   async searchExperts(params: ExpertSearchInput): Promise<Expert[]> {
+    // Convert search parameters to match the actual Supabase function
+    const companies = params.currentCompany ? [params.currentCompany] : [];
+    const roleKeywords = params.currentTitle ? [params.currentTitle] : 
+                        params.query ? params.query.split(' ').filter(word => word.length > 2) : [];
+    
     const { data, error } = await this.expertsClient
       .rpc('search_experts_company_role', {
-        current_company_filter: params.currentCompany || null,
-        current_title_filter: params.currentTitle || null,
-        location_filter: params.location || null,
-        result_limit: params.limit,
-        search_query: params.query
+        p_companies: companies,
+        p_role_keywords: roleKeywords,
+        p_employment_status: 'any',
+        p_limit: params.limit || 10
       });
 
     if (error) {
