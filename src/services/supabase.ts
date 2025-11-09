@@ -40,8 +40,11 @@ export class SupabaseService {
     }
 
     if (params.questionTopic) {
+      // Use AI agent to improve search terms for better results
+      const enhancedSearchTerms = await this.generateInsightSearchQuery(params.questionTopic);
+      
       // Sanitize the search term to prevent SQL injection and parsing errors
-      const sanitizedTopic = params.questionTopic.replace(/[;'"\\]/g, ' ').trim();
+      const sanitizedTopic = enhancedSearchTerms.replace(/[;'"\\]/g, ' ').trim();
       query = query.or(`question_text.ilike.%${sanitizedTopic}%,answer_summary.ilike.%${sanitizedTopic}%`);
     }
 
@@ -86,6 +89,72 @@ export class SupabaseService {
     }
 
     return data || [];
+  }
+
+  private async generateInsightSearchQuery(query: string): Promise<string> {
+    // Create an AI agent to convert natural language to effective interview search terms
+    const prompt = `You are an expert at converting natural language queries into effective search terms for finding expert interview insights.
+
+Your task: Convert the user's natural language query into 2-3 focused search terms that will find relevant expert interviews.
+
+EXAMPLES:
+
+User: "What do executives think about vendor consolidation?"
+Output: "vendor consolidation executive decision"
+
+User: "How do CHROs allocate executive search budgets?"  
+Output: "budget allocation executive search CHRO"
+
+User: "What are trends in AI adoption?"
+Output: "AI adoption trends technology"
+
+User: "How do companies decide on insourcing vs outsourcing?"
+Output: "insourcing outsourcing decision strategy"
+
+User: "What drives executive search firm selection?"
+Output: "executive search firm selection criteria"
+
+RULES:
+- Return 2-4 key search terms separated by spaces
+- Include the main topic/concept
+- Include relevant role titles if mentioned (CEO, CHRO, VP, etc.)
+- Include action words (decision, allocation, strategy, trends, etc.)
+- Keep it concise and focused
+- No quotes or special characters
+
+Convert this query: "${query}"
+
+Return only the search terms, nothing else.`;
+
+    try {
+      const anthropicKey = process.env.ANTHROPIC_API_KEY;
+      if (anthropicKey) {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': anthropicKey,
+            'anthropic-version': '2023-06-01'
+          },
+          body: JSON.stringify({
+            model: 'claude-3-sonnet-20240229',
+            max_tokens: 100,
+            messages: [{ role: 'user', content: prompt }]
+          })
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          const searchTerms = result.content[0].text.trim();
+          return searchTerms;
+        }
+      }
+    } catch (error) {
+      console.warn('Insights search agent failed, using original query:', error);
+    }
+
+    // Fallback: return original query
+    return query;
   }
 
   private async generateSearchQueries(query: string, currentCompany?: string, currentTitle?: string): Promise<Array<{
@@ -170,6 +239,12 @@ Generate **exactly 5 diverse search queries** with this strategy:
 - 2-3 competitor companies
 - Executive-level keywords only (Chief, VP, C-level)
 - Employment status: 'former' (find people who left)
+
+**SPECIAL HANDLING:**
+- If query mentions "Big 5" or "executive search firms": Use ["Korn Ferry", "Russell Reynolds", "Heidrick & Struggles", "Spencer Stuart", "Egon Zehnder"]
+- If query mentions "consulting": Use ["McKinsey", "Bain", "BCG", "Deloitte", "PwC", "EY", "KPMG"]
+- If query mentions "tech giants": Use ["Google", "Microsoft", "Meta", "Amazon", "Apple"]
+- If query mentions "fintech": Use ["Stripe", "Square", "PayPal", "Plaid", "Coinbase"]
 
 Generate searches for: "${fullQuery}"
 

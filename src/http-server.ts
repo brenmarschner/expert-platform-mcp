@@ -50,21 +50,21 @@ const mcpServer = new Server(
 const mcpTools = [
   {
     name: 'search_insights',
-    description: 'Search expert interviews for insights and opinions on any topic. Returns actual expert responses with credibility scores.',
+    description: 'Search expert interviews for insights and opinions on any topic. Returns actual expert quotes with full profiles and credibility scores. Works with natural language queries about business topics, trends, strategies, and decisions.',
     inputSchema: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
-          description: 'What you want to find expert insights about (e.g., "vendor consolidation", "budget allocation", "AI trends")',
+          description: 'Natural language query about what insights you want to find. Examples: "What do executives think about vendor consolidation?", "How do CHROs allocate budgets?", "What are the trends in executive search?", "How do companies decide on insourcing vs outsourcing?"',
         },
         expertName: {
           type: 'string',
-          description: 'Filter by specific expert name',
+          description: 'Filter by specific expert name (e.g., "Rudy Alanis", "Aaron Birnbaum")',
         },
         minCredibilityScore: {
           type: 'number',
-          description: 'Minimum credibility score (0-10) to filter high-quality responses',
+          description: 'Minimum credibility score (0-10) to filter high-quality responses. Use 7+ for highly credible experts.',
           minimum: 0,
           maximum: 10,
         },
@@ -81,25 +81,25 @@ const mcpTools = [
   },
   {
     name: 'search_experts',
-    description: 'Find and discover experts by company, role, industry, or expertise area. Returns expert profiles with current positions.',
+    description: 'Find experts by company and role using AI-powered strategic search. Works best with specific companies and job titles. For Big 5 executive search firms use: Korn Ferry, Russell Reynolds, Heidrick & Struggles, Spencer Stuart, Egon Zehnder. For tech companies use: Google, Microsoft, Meta, Amazon, Apple, etc.',
     inputSchema: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
-          description: 'What type of expert to find (e.g., "fintech executives", "AI engineers", "healthcare leaders")',
+          description: 'Natural language description of experts to find. Examples: "executives from Big 5 search firms", "fintech leaders at Stripe or Square", "AI engineers at Google", "healthcare executives", "VPs at consulting firms". The AI agent will convert this to strategic company/role searches.',
         },
         currentCompany: {
           type: 'string',
-          description: 'Filter by current company name',
+          description: 'Specific company name to filter by (e.g., "Korn Ferry", "Google", "Stripe")',
         },
         currentTitle: {
           type: 'string',
-          description: 'Filter by current job title',
+          description: 'Specific job title to filter by (e.g., "VP", "Director", "Chief")',
         },
         location: {
           type: 'string',
-          description: 'Filter by location',
+          description: 'Geographic location filter (e.g., "San Francisco", "New York")',
         },
         limit: {
           type: 'number',
