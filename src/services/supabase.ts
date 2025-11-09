@@ -40,8 +40,27 @@ export class SupabaseService {
     }
 
     if (params.questionTopic) {
-      // Direct search works best - sanitize and search as-is
-      const sanitizedTopic = params.questionTopic.replace(/[;'"\\]/g, ' ').trim();
+      // Extract key terms from verbose queries
+      let searchTerms = params.questionTopic;
+      
+      // If query is too long (>50 chars), extract key terms
+      if (searchTerms.length > 50) {
+        // Remove common filler words and extract meaningful terms
+        const fillerWords = ['interviews', 'with', 'customers', 'of', 'the', 'and', 'or', 'about', 'for', 'in', 'on', 'at', 'to', 'from', 'all', 'find', 'search', 'please', 'me'];
+        const words = searchTerms.toLowerCase().split(/[\s,;]+/);
+        const keyWords = words.filter(word => 
+          word.length > 2 && 
+          !fillerWords.includes(word) &&
+          !/^[\(\)\[\]]+$/.test(word)
+        );
+        
+        // Take first 3-5 meaningful words
+        searchTerms = keyWords.slice(0, 5).join(' ');
+        console.log(`Extracted key terms from verbose query: "${params.questionTopic}" → "${searchTerms}"`);
+      }
+      
+      // Sanitize the search term to prevent SQL injection
+      const sanitizedTopic = searchTerms.replace(/[;'"\\]/g, ' ').trim();
       query = query.or(`question_text.ilike.%${sanitizedTopic}%,answer_summary.ilike.%${sanitizedTopic}%`);
     }
 
