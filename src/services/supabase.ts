@@ -297,15 +297,40 @@ Return ONLY valid JSON in the exact format shown above. No explanatory text befo
       console.warn('AI agent failed, using fallback:', error);
     }
 
-    // Fallback: simple single search
-    const companies = currentCompany ? [currentCompany] : [];
-    const roleKeywords = currentTitle ? [currentTitle] : query.split(' ').filter(word => word.length > 2);
+    // Enhanced fallback: smart detection for common patterns
+    let companies: string[] = [];
+    let roleKeywords: string[] = [];
+    
+    if (currentCompany) companies.push(currentCompany);
+    if (currentTitle) roleKeywords.push(currentTitle);
+    
+    const queryLower = query.toLowerCase();
+    
+    // Smart pattern detection
+    if (queryLower.includes('big 5') || queryLower.includes('executive search firm')) {
+      companies = ['Korn Ferry', 'Russell Reynolds', 'Heidrick & Struggles', 'Spencer Stuart', 'Egon Zehnder'];
+      roleKeywords = ['Partner', 'Principal', 'Director', 'VP', 'Executive Recruiter', 'Managing Director', 'Senior Associate'];
+    } else if (queryLower.includes('consulting')) {
+      companies = ['McKinsey', 'Bain', 'BCG', 'Deloitte', 'PwC', 'EY', 'KPMG'];
+      roleKeywords = ['Partner', 'Principal', 'Director', 'VP', 'Manager', 'Senior Manager'];
+    } else if (queryLower.includes('fintech')) {
+      companies = ['Stripe', 'Square', 'PayPal', 'Plaid', 'Coinbase', 'Robinhood', 'Chime'];
+      roleKeywords = ['VP', 'Director', 'Head', 'Lead', 'Senior', 'Chief', 'Executive'];
+    } else if (queryLower.includes('tech') || queryLower.includes('google') || queryLower.includes('microsoft')) {
+      companies = ['Google', 'Microsoft', 'Meta', 'Amazon', 'Apple', 'Netflix', 'Uber'];
+      roleKeywords = ['VP', 'Director', 'Head', 'Lead', 'Senior', 'Principal', 'Manager', 'Engineering'];
+    } else {
+      // Generic fallback
+      roleKeywords = query.split(' ').filter(word => word.length > 2);
+    }
+    
+    console.log(`Expert search fallback - Query: ${query}, Companies: ${companies.join(',')}, Roles: ${roleKeywords.join(',')}`);
     
     return [{
       companies,
       role_keywords: roleKeywords,
       employment_status: 'any' as const,
-      reasoning: 'Fallback search when AI agent is unavailable'
+      reasoning: 'Smart fallback search with pattern detection'
     }];
   }
 
