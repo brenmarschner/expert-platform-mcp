@@ -46,11 +46,11 @@ const mcpServer = new Server(
   }
 );
 
-// Define required MCP tools for ChatGPT
+// Define MCP tools for ChatGPT
 const mcpTools = [
   {
-    name: 'search',
-    description: 'Search expert interviews for insights on any topic. Returns actual expert responses with credibility scores.',
+    name: 'search_insights',
+    description: 'Search expert interviews for insights and opinions on any topic. Returns actual expert responses with credibility scores.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -80,7 +80,71 @@ const mcpTools = [
     },
   },
   {
-    name: 'fetch',
+    name: 'search_experts',
+    description: 'Find and discover experts by company, role, industry, or expertise area. Returns expert profiles with current positions.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'What type of expert to find (e.g., "fintech executives", "AI engineers", "healthcare leaders")',
+        },
+        currentCompany: {
+          type: 'string',
+          description: 'Filter by current company name',
+        },
+        currentTitle: {
+          type: 'string',
+          description: 'Filter by current job title',
+        },
+        location: {
+          type: 'string',
+          description: 'Filter by location',
+        },
+        limit: {
+          type: 'number',
+          description: 'Number of results to return',
+          default: 10,
+          minimum: 1,
+          maximum: 50,
+        },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'generate_questions',
+    description: 'Generate interview questions for a specific topic or expert type. Useful for creating interview guides.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        topic: {
+          type: 'string',
+          description: 'The main topic or research area (e.g., "fintech regulatory challenges", "AI in healthcare")',
+        },
+        expertBackground: {
+          type: 'string',
+          description: 'Type of expert to interview (e.g., "fintech executive", "AI researcher")',
+        },
+        questionCount: {
+          type: 'number',
+          description: 'Number of questions to generate',
+          default: 10,
+          minimum: 5,
+          maximum: 25,
+        },
+        difficulty: {
+          type: 'string',
+          enum: ['beginner', 'intermediate', 'advanced'],
+          description: 'Difficulty level of questions',
+          default: 'intermediate',
+        },
+      },
+      required: ['topic'],
+    },
+  },
+  {
+    name: 'fetch_profile',
     description: 'Get detailed expert profile and background information by expert ID or name.',
     inputSchema: {
       type: 'object',
@@ -935,7 +999,7 @@ app.post('/mcp', async (req, res) => {
       try {
         let result;
         switch (name) {
-          case 'search': {
+          case 'search_insights': {
             const searchParams = {
               questionTopic: args?.query,
               expertName: args?.expertName,
@@ -945,7 +1009,28 @@ app.post('/mcp', async (req, res) => {
             result = await handleInterviewTool('search_interviews', searchParams);
             break;
           }
-          case 'fetch': {
+          case 'search_experts': {
+            const searchParams = {
+              query: args?.query,
+              currentCompany: args?.currentCompany,
+              currentTitle: args?.currentTitle,
+              location: args?.location,
+              limit: args?.limit || 10,
+            };
+            result = await handleExpertTool('search_experts', searchParams);
+            break;
+          }
+          case 'generate_questions': {
+            const questionParams = {
+              topic: args?.topic,
+              expertBackground: args?.expertBackground,
+              questionCount: args?.questionCount || 10,
+              difficulty: args?.difficulty || 'intermediate',
+            };
+            result = await handleRequestTool('generate_interview_questions', questionParams);
+            break;
+          }
+          case 'fetch_profile': {
             if (args?.expertId) {
               result = await handleExpertTool('get_expert_profile', { expertId: args.expertId });
             } else if (args?.expertName) {
@@ -1040,7 +1125,7 @@ const server = app.listen(PORT, async () => {
   console.log(`   - POST /api/requests/generate-questions - Generate questions`);
   console.log(`   - POST /api/requests/expert-sourcing - Request expert sourcing`);
   console.log(`   - POST /api/requests/launch-interview - Launch interview request`);
-  console.log(`🤖 MCP Tools: search (expert insights), fetch (expert profiles)`);
+  console.log(`🤖 MCP Tools: search_insights, search_experts, generate_questions, fetch_profile`);
   console.log(`✅ MCP endpoints configured at /mcp`);
 });
 
