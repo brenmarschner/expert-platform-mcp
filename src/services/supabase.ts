@@ -40,7 +40,9 @@ export class SupabaseService {
     }
 
     if (params.questionTopic) {
-      query = query.or(`question_text.ilike.%${params.questionTopic}%,answer_summary.ilike.%${params.questionTopic}%`);
+      // Sanitize the search term to prevent SQL injection and parsing errors
+      const sanitizedTopic = params.questionTopic.replace(/[;'"\\]/g, ' ').trim();
+      query = query.or(`question_text.ilike.%${sanitizedTopic}%,answer_summary.ilike.%${sanitizedTopic}%`);
     }
 
     if (params.dateFrom) {
