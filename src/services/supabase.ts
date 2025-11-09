@@ -89,11 +89,11 @@ export class SupabaseService {
   async searchExperts(params: ExpertSearchInput): Promise<Expert[]> {
     const { data, error } = await this.expertsClient
       .rpc('search_experts_company_role', {
-        search_query: params.query,
         current_company_filter: params.currentCompany || null,
         current_title_filter: params.currentTitle || null,
         location_filter: params.location || null,
-        result_limit: params.limit
+        result_limit: params.limit,
+        search_query: params.query
       });
 
     if (error) {
