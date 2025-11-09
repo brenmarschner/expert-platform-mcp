@@ -45,13 +45,13 @@ const mcpServer = new Server(
 const mcpTools = [
   {
     name: 'search_insights',
-    description: 'Search expert interviews for investment diligence insights. Find expert opinions on market dynamics, competitive positioning, business strategy, operational challenges, and industry trends. Returns actual expert quotes with credibility scores.',
+    description: 'Search expert interviews for investment diligence insights. Find expert opinions on market dynamics, competitive positioning, business strategy, operational challenges, and industry trends. Returns actual expert quotes with credibility scores. IMPORTANT: Use SHORT, FOCUSED search terms (2-4 keywords) for best results.',
     inputSchema: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
-          description: 'Investment diligence question about business strategy, market trends, competitive dynamics, or operational challenges. Examples: "competitive dynamics in fintech", "pricing strategy challenges", "market consolidation trends", "technology adoption barriers"',
+          description: 'SHORT search terms (2-4 keywords maximum). GOOD: "EASM software", "pricing strategy", "vendor consolidation". BAD: Long sentences or multiple concepts. Use simple, direct terms that would appear in interview questions/answers.',
         },
         expertName: {
           type: 'string',
