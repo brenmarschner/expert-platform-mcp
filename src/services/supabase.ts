@@ -72,6 +72,134 @@ export class SupabaseService {
     return data || [];
   }
 
+  private async generateSearchQueries(query: string, currentCompany?: string, currentTitle?: string): Promise<Array<{
+    companies: string[];
+    role_keywords: string[];
+    employment_status: 'current' | 'former' | 'any';
+    reasoning: string;
+  }>> {
+    // Build the full query including explicit parameters
+    let fullQuery = query;
+    if (currentCompany) {
+      fullQuery += ` at ${currentCompany}`;
+    }
+    if (currentTitle) {
+      fullQuery += ` ${currentTitle}`;
+    }
+
+    const prompt = `You are an expert search query generator for a company and role-based search system.
+
+## CRITICAL OUTPUT FORMAT REQUIREMENT
+
+**YOU MUST RETURN EXACTLY THIS JSON STRUCTURE:**
+\`\`\`json
+{
+  "searches": [
+    {
+      "companies": ["GlobalFoundries", "Intel Foundry"],
+      "role_keywords": ["VP", "Director"],
+      "employment_status": "current",
+      "reasoning": "Example reasoning"
+    },
+    {
+      "companies": ["Samsung", "TSMC"],
+      "role_keywords": ["procurement"],
+      "employment_status": "any",
+      "reasoning": "Example reasoning"
+    }
+  ]
+}
+\`\`\`
+
+**RULES:**
+- ✅ ALWAYS return exactly 5 separate search objects in the "searches" array
+- ✅ Each search must have: companies (array), role_keywords (array), employment_status (string), reasoning (string)
+- ❌ DO NOT return a single search with all companies combined
+- ❌ DO NOT put companies or role_keywords at root level
+- ❌ DO NOT return more or less than 5 searches
+
+## SEARCH SYSTEM OVERVIEW
+
+The system searches LinkedIn profiles based on:
+- **Companies** (highest priority - 40 points)
+- **Role keywords** (titles like VP, Director, CISO - 30 points)
+- **Recency** (last 5 years - 30 points)
+- **Employment status** (current, former, or any)
+
+## YOUR TASK
+
+Generate **exactly 5 diverse search queries** with this strategy:
+
+**Search 1: Broad company list, specific senior roles**
+- 4-5 major companies from the industry
+- 1-2 senior role keywords (VP, Director, Chief)
+- Employment status: 'any'
+
+**Search 2: Top companies, broad roles**
+- 2-3 most relevant companies
+- 2-3 related role keywords
+- Employment status: 'current'
+
+**Search 3: Company name variations, specific seniority**
+- 2-4 companies with name variations (e.g., "Intel", "Intel Corporation", "Intel Foundry")
+- Seniority keywords (VP, Director, Chief)
+- Employment status: 'current'
+
+**Search 4: Secondary/niche companies, functional roles**
+- 2-3 smaller or adjacent companies
+- 2-3 functional keywords
+- Employment status: 'any'
+
+**Search 5: Competitor companies, executive level**
+- 2-3 competitor companies
+- Executive-level keywords only (Chief, VP, C-level)
+- Employment status: 'former' (find people who left)
+
+Generate searches for: "${fullQuery}"
+
+Return ONLY valid JSON in the exact format shown above. No explanatory text before or after. Just the JSON.`;
+
+    try {
+      // Use Anthropic API if available
+      const anthropicKey = process.env.ANTHROPIC_API_KEY;
+      if (anthropicKey) {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': anthropicKey,
+            'anthropic-version': '2023-06-01'
+          },
+          body: JSON.stringify({
+            model: 'claude-3-sonnet-20240229',
+            max_tokens: 2000,
+            messages: [{ role: 'user', content: prompt }]
+          })
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          const content = result.content[0].text;
+          const parsed = JSON.parse(content);
+          return parsed.searches;
+        }
+      }
+    } catch (error) {
+      console.warn('AI agent failed, using fallback:', error);
+    }
+
+    // Fallback: simple single search
+    const companies = currentCompany ? [currentCompany] : [];
+    const roleKeywords = currentTitle ? [currentTitle] : query.split(' ').filter(word => word.length > 2);
+    
+    return [{
+      companies,
+      role_keywords: roleKeywords,
+      employment_status: 'any' as const,
+      reasoning: 'Fallback search when AI agent is unavailable'
+    }];
+  }
+
   async getExpertInterviewHistory(expertId: number): Promise<InterviewMessage[]> {
     const { data, error } = await this.interviewsClient
       .from('interview_messages')
@@ -87,34 +215,22 @@ export class SupabaseService {
   }
 
   async searchExperts(params: ExpertSearchInput): Promise<Expert[]> {
-    // Since there are no functions, do direct table search
-    let query = this.expertsClient
-      .from('experts')
-      .select('*');
-
-    // Apply filters
-    if (params.currentCompany) {
-      query = query.ilike('current_company', `%${params.currentCompany}%`);
-    }
-
-    if (params.currentTitle) {
-      query = query.ilike('current_title', `%${params.currentTitle}%`);
-    }
-
-    if (params.location) {
-      query = query.ilike('location', `%${params.location}%`);
-    }
-
-    if (params.query) {
-      // Search across multiple fields for the general query
-      query = query.or(`current_company.ilike.%${params.query}%,current_title.ilike.%${params.query}%,background_summary.ilike.%${params.query}%,searchable_text.ilike.%${params.query}%`);
-    }
-
-    query = query
-      .order('created_at', { ascending: false })
-      .limit(params.limit || 10);
-
-    const { data, error } = await query;
+    // Use AI agent to generate strategic search, but only use the first one
+    const searches = await this.generateSearchQueries(
+      params.query || '', 
+      params.currentCompany, 
+      params.currentTitle
+    );
+    
+    // Use the first (best) search with higher limit
+    const primarySearch = searches[0];
+    const { data, error } = await this.expertsClient
+      .rpc('search_experts_company_role', {
+        p_companies: primarySearch.companies,
+        p_role_keywords: primarySearch.role_keywords,
+        p_employment_status: primarySearch.employment_status,
+        p_limit: params.limit || 50  // Return more results
+      });
 
     if (error) {
       throw new Error(`Failed to search experts: ${error.message}`);
