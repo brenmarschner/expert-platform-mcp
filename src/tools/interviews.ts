@@ -158,22 +158,19 @@ export async function handleInterviewTool(name: string, arguments_: any): Promis
         let resultText = `Found ${interviews.length} expert insights:\n\n`;
         
         interviews.forEach((interview, index) => {
-          resultText += `## Insight ${index + 1}: ${interview.expert_name} (Credibility: ${interview.credibility_score}/10)\n\n`;
+          // FOCUS ON ANSWER_SUMMARY as the primary content
+          resultText += `**${interview.expert_name}** (Credibility: ${interview.credibility_score}/10):\n`;
+          resultText += `${interview.answer_summary}\n\n`;
           
+          // Context in smaller text
           if (interview.question_text) {
-            resultText += `**Question:** ${interview.question_text}\n\n`;
+            resultText += `*Question asked: ${interview.question_text}*\n`;
           }
+          resultText += `*Consensus score: ${interview.consensus_score}/10*\n\n`;
           
-          resultText += `**Expert Response:** ${interview.answer_summary}\n\n`;
-          
-          if (interview.expert_profile) {
-            // Extract just the key info from profile
-            const profileLines = interview.expert_profile.split('\n').slice(0, 6).join('\n');
-            resultText += `**Expert Background:**\n${profileLines}\n\n`;
+          if (index < interviews.length - 1) {
+            resultText += `---\n\n`;
           }
-          
-          resultText += `*Consensus: ${interview.consensus_score}/10 | Credibility: ${interview.credibility_score}/10*\n\n`;
-          resultText += `---\n\n`;
         });
         
         return {
