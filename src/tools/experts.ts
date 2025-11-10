@@ -108,6 +108,12 @@ export async function handleExpertTool(name: string, arguments_: any): Promise<a
         experts.forEach((expert, index) => {
           resultText += `${index + 1}. **${expert.full_name}**\n`;
           resultText += `   - Current: ${expert.current_title || 'N/A'} at ${expert.current_company || 'N/A'}\n`;
+          
+          // ADD SEARCHABLE_TEXT - this is the rich background content
+          if ((expert as any).searchable_text) {
+            resultText += `   - Background: ${(expert as any).searchable_text.substring(0, 300)}...\n`;
+          }
+          
           if (expert.location) {
             resultText += `   - Location: ${expert.location}\n`;
           }
