@@ -102,29 +102,45 @@ export async function handleExpertTool(name: string, arguments_: any): Promise<a
         const params = ExpertSearchSchema.parse(arguments_);
         const experts = await supabase.searchExperts(params);
         
+        // Format results in a user-friendly way for ChatGPT to display
+        let resultText = `Found ${experts.length} experts matching "${params.query}":\n\n`;
+        
+        experts.forEach((expert, index) => {
+          resultText += `${index + 1}. **${expert.full_name}**\n`;
+          resultText += `   - Current: ${expert.current_title || 'N/A'} at ${expert.current_company || 'N/A'}\n`;
+          if (expert.location) {
+            resultText += `   - Location: ${expert.location}\n`;
+          }
+          if (expert.recent_companies && expert.recent_companies.length > 1) {
+            resultText += `   - Recent companies: ${expert.recent_companies.slice(0, 3).join(', ')}\n`;
+          }
+          if (expert.linkedin_url) {
+            resultText += `   - LinkedIn: ${expert.linkedin_url}\n`;
+          }
+          resultText += '\n';
+        });
+        
+        // Also include structured data for programmatic access
+        resultText += `\n---\nStructured Data:\n${JSON.stringify({
+          total_results: experts.length,
+          search_query: params.query,
+          experts: experts.map(expert => ({
+            id: expert.id,
+            full_name: expert.full_name,
+            current_company: expert.current_company,
+            current_title: expert.current_title,
+            location: expert.location,
+            linkedin_url: expert.linkedin_url,
+            recent_companies: expert.recent_companies,
+            recent_titles: expert.recent_titles
+          }))
+        }, null, 2)}`;
+        
         return {
           content: [
             {
               type: 'text',
-              text: JSON.stringify({
-                total_results: experts.length,
-                search_query: params.query,
-                experts: experts.map(expert => ({
-                  id: expert.id,
-                  full_name: expert.full_name,
-                  current_company: expert.current_company,
-                  current_title: expert.current_title,
-                  location: expert.location,
-                  background_summary: expert.background_summary,
-                  state: expert.state,
-                  linkedin_url: expert.linkedin_url,
-                  recent_companies: expert.recent_companies,
-                  recent_titles: expert.recent_titles,
-                  is_currently_employed: expert.is_currently_employed,
-                  qa_passed: expert.qa_passed,
-                  call_booked: expert.call_booked
-                }))
-              }, null, 2)
+              text: resultText
             }
           ]
         };

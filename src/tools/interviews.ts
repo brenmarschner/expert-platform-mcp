@@ -154,25 +154,33 @@ export async function handleInterviewTool(name: string, arguments_: any): Promis
         const params = InterviewSearchSchema.parse(arguments_);
         const interviews = await supabase.searchInterviews(params);
         
+        // Format results for ChatGPT display
+        let resultText = `Found ${interviews.length} expert insights:\n\n`;
+        
+        interviews.forEach((interview, index) => {
+          resultText += `## Insight ${index + 1}: ${interview.expert_name} (Credibility: ${interview.credibility_score}/10)\n\n`;
+          
+          if (interview.question_text) {
+            resultText += `**Question:** ${interview.question_text}\n\n`;
+          }
+          
+          resultText += `**Expert Response:** ${interview.answer_summary}\n\n`;
+          
+          if (interview.expert_profile) {
+            // Extract just the key info from profile
+            const profileLines = interview.expert_profile.split('\n').slice(0, 6).join('\n');
+            resultText += `**Expert Background:**\n${profileLines}\n\n`;
+          }
+          
+          resultText += `*Consensus: ${interview.consensus_score}/10 | Credibility: ${interview.credibility_score}/10*\n\n`;
+          resultText += `---\n\n`;
+        });
+        
         return {
           content: [
             {
               type: 'text',
-              text: JSON.stringify({
-                total_results: interviews.length,
-                interviews: interviews.map(interview => ({
-                  id: interview.id,
-                  expert_name: interview.expert_name,
-                  expert_profile: interview.expert_profile,
-                  question_text: interview.question_text,
-                  answer_summary: interview.answer_summary,
-                  consensus_score: interview.consensus_score,
-                  credibility_score: interview.credibility_score,
-                  completion_score: interview.completion_score,
-                  created_at: interview.created_at,
-                  project_id: interview.project_id
-                }))
-              }, null, 2)
+              text: resultText
             }
           ]
         };
