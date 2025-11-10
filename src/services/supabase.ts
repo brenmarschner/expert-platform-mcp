@@ -126,96 +126,133 @@ export class SupabaseService {
       fullQuery += ` ${currentTitle}`;
     }
 
-    const prompt = `You are an expert search query generator for a company and role-based search system.
+    const prompt = `You are a search query translator. Your ONLY job is to extract company names and job role keywords from user queries.
 
-## CRITICAL OUTPUT FORMAT REQUIREMENT
+## CRITICAL RULES
 
-**YOU MUST RETURN EXACTLY THIS JSON STRUCTURE:**
+1. **Extract ONLY company names** - exact company names mentioned or implied
+2. **Extract ONLY job role keywords** - job titles, seniority levels, or functions mentioned
+3. **Do NOT add companies not mentioned** in the query
+4. **Do NOT add generic keywords** - only actual job titles/roles
+5. **Return EXACTLY 5 search variations** to maximize coverage
+
+## OUTPUT FORMAT (MUST MATCH EXACTLY)
+
 \`\`\`json
 {
   "searches": [
     {
-      "companies": ["GlobalFoundries", "Intel Foundry"],
-      "role_keywords": ["VP", "Director"],
-      "employment_status": "current",
-      "reasoning": "Example reasoning"
-    },
-    {
-      "companies": ["Samsung", "TSMC"],
-      "role_keywords": ["procurement"],
-      "employment_status": "any",
-      "reasoning": "Example reasoning"
+      "companies": ["Exact", "Company", "Names"],
+      "role_keywords": ["Job", "Title", "Keywords"],
+      "employment_status": "current" or "former" or "any",
+      "reasoning": "brief explanation"
     }
   ]
 }
 \`\`\`
 
-**RULES:**
-- ✅ ALWAYS return exactly 5 separate search objects in the "searches" array
-- ✅ Each search must have: companies (array), role_keywords (array), employment_status (string), reasoning (string)
-- ❌ DO NOT return a single search with all companies combined
-- ❌ DO NOT put companies or role_keywords at root level
-- ❌ DO NOT return more or less than 5 searches
+## COMPANY EXTRACTION RULES
 
-## SEARCH SYSTEM OVERVIEW
+**Extract companies mentioned:**
+- "former Insight Enterprises employees" → companies: ["Insight Enterprises", "Insight"]
+- "current employees at CDW" → companies: ["CDW"]  
+- "people from Google or Microsoft" → companies: ["Google", "Microsoft"]
+- "Big 5" → companies: ["Korn Ferry", "Russell Reynolds", "Heidrick & Struggles", "Spencer Stuart", "Egon Zehnder"]
+- "MBB" or "consulting" → companies: ["McKinsey", "Bain", "BCG"]
 
-The system searches LinkedIn profiles based on:
-- **Companies** (highest priority - 40 points)
-- **Role keywords** (titles like VP, Director, CISO - 30 points)
-- **Recency** (last 5 years - 30 points)
-- **Employment status** (current, former, or any)
+**Include company name variations:**
+- "SHI" → ["SHI", "SHI International", "SHI International Corp"]
+- "Insight" → ["Insight", "Insight Enterprises"]
+- Always include 2-3 name variations for each company
+
+## ROLE KEYWORD EXTRACTION RULES
+
+**Extract ONLY roles/titles mentioned or implied:**
+- "engineering experts" → role_keywords: ["Engineering", "Engineer", "Software Engineer"]
+- "VPs" → role_keywords: ["VP", "Vice President"]
+- "sales leaders" → role_keywords: ["Sales", "Account", "Business Development"]
+- "IT resellers" → role_keywords: ["Sales", "Account Manager", "Solutions", "Services"]
+
+**IMPORTANT:** If NO specific role is mentioned, use broad seniority levels:
+- role_keywords: ["VP", "Director", "Manager", "Lead", "Senior"]
+
+## EMPLOYMENT STATUS RULES
+
+- "former" or "ex-" → employment_status: "former"
+- "current" → employment_status: "current"  
+- Both or neither → employment_status: "any"
 
 ## YOUR TASK
 
-FOCUS: Finding current and former employees of specific companies with relevant role experience.
+Extract companies and roles from this query: "${fullQuery}"
 
-Generate **exactly 5 diverse search queries** optimized for company + role targeting:
+Generate **exactly 5 search variations** that cover:
 
-**Search 1: Target companies, broad seniority levels**
-- 3-4 most relevant companies from the query
-- Wide range of seniority: VP, Director, Senior Director, Managing Director, Head, Lead, Senior, Principal
-- Employment status: 'any'
+**Search 1: All mentioned companies + broad roles**
+- Include ALL companies from the query (with variations)
+- Broad seniority: VP, Director, Manager, Senior, Lead
 
-**Search 2: Target companies, specific functional roles**
-- 2-3 most relevant companies
-- Functional role keywords based on query context
-- Employment status: 'current'
+**Search 2: Primary companies + specific roles**
+- Top 2-3 companies
+- Specific role keywords from query
 
-**Search 3: Company variations and subsidiaries**
-- Include company name variations, subsidiaries, former names
-- Executive-level roles: Chief, VP, C-level, President
-- Employment status: 'current'
+**Search 3: Company variations**
+- Include name variations (CDW, SHI International Corp, etc.)
+- Executive roles: VP, Director, Chief
 
-**Search 4: Adjacent/competitor companies**
-- 2-3 competitor or related companies in same industry
-- Mid-level roles: Manager, Senior Manager, Director
-- Employment status: 'any'
+**Search 4: All companies + mid-level roles**
+- Same companies
+- Manager, Senior, Specialist levels
 
-**Search 5: Former employees strategy**
-- Same target companies as Search 1
-- Senior roles only: VP, Director, Chief, Head
-- Employment status: 'former' (find people who left)
+**Search 5: Employment status focused**
+- Same companies
+- Match employment status from query (current/former/any)
 
-**SPECIAL HANDLING:**
-- If query mentions "Big 5" or "executive search firms": Use ["Korn Ferry", "Russell Reynolds", "Heidrick & Struggles", "Spencer Stuart", "Egon Zehnder", "Korn Ferry International", "Russell Reynolds Associates"]
-- If query mentions "consulting": Use ["McKinsey", "Bain", "BCG", "Deloitte", "PwC", "EY", "KPMG"]
-- If query mentions "tech giants": Use ["Google", "Microsoft", "Meta", "Amazon", "Apple"]
-- If query mentions "fintech": Use ["Stripe", "Square", "PayPal", "Plaid", "Coinbase"]
+## EXAMPLE
 
-**BE EXTREMELY AGGRESSIVE WITH ROLE KEYWORDS:**
-- Include ALL possible variations: "VP", "Vice President", "Director", "Senior Director", "Managing Director", "Chief", "Head", "Lead", "Senior", "Principal", "Manager", "Senior Manager"
-- For executive search firms specifically: "Partner", "Principal", "Managing Director", "Executive Recruiter", "Senior Associate", "Associate", "Consultant", "Senior Consultant", "Practice Leader"
-- For any industry: Include functional titles like "Engineering", "Product", "Sales", "Marketing", "Operations", "Finance", "Strategy", "Business Development"
-- Cast a WIDE NET - better to include too many role keywords than too few
+Query: "former Insight Enterprises employees or current employees at CDW, SHI"
 
-**BE AGGRESSIVE WITH COMPANY VARIATIONS:**
-- Include full legal names, shortened names, and common variations
-- For each company, include 2-3 name variations
-- Include subsidiary and division names where relevant
+Output:
+\`\`\`json
+{
+  "searches": [
+    {
+      "companies": ["Insight Enterprises", "Insight", "CDW", "SHI", "SHI International"],
+      "role_keywords": ["VP", "Director", "Manager", "Senior", "Lead"],
+      "employment_status": "any",
+      "reasoning": "All mentioned companies with broad seniority"
+    },
+    {
+      "companies": ["CDW", "SHI"],
+      "role_keywords": ["Sales", "Account", "Solutions"],
+      "employment_status": "current",
+      "reasoning": "Current employees at CDW/SHI in sales roles"
+    },
+    {
+      "companies": ["Insight Enterprises", "Insight"],
+      "role_keywords": ["VP", "Director"],
+      "employment_status": "former",
+      "reasoning": "Former Insight employees, senior levels"
+    },
+    {
+      "companies": ["CDW", "SHI International", "SHI International Corp"],
+      "role_keywords": ["Executive", "Vice President"],
+      "employment_status": "current",
+      "reasoning": "Company name variations for CDW/SHI"
+    },
+    {
+      "companies": ["Insight", "CDW", "SHI"],
+      "role_keywords": ["Manager", "Senior Manager"],
+      "employment_status": "any",
+      "reasoning": "Mid-level roles across all companies"
+    }
+  ]
+}
+\`\`\`
 
-Generate searches for: "${fullQuery}"
+Now extract from: "${fullQuery}"
 
-Return ONLY valid JSON in the exact format shown above. No explanatory text before or after. Just the JSON.`;
+Return ONLY the JSON. No explanatory text.`;
 
     try {
       // Use Anthropic API if available
@@ -262,6 +299,9 @@ Return ONLY valid JSON in the exact format shown above. No explanatory text befo
     } else if (queryLower.includes('consulting')) {
       companies = ['McKinsey', 'Bain', 'BCG', 'Deloitte', 'PwC', 'EY', 'KPMG'];
       roleKeywords = ['Partner', 'Principal', 'Director', 'VP', 'Manager', 'Senior Manager'];
+    } else if (queryLower.includes('cdw') || queryLower.includes('shi') || queryLower.includes('insight enterprises') || queryLower.includes('it reseller')) {
+      companies = ['CDW', 'SHI', 'SHI International', 'Insight Enterprises', 'Insight', 'Softchoice', 'Connection', 'PCM'];
+      roleKeywords = ['VP', 'Vice President', 'Director', 'Manager', 'Sales', 'Account', 'Executive'];
     } else if (queryLower.includes('fintech')) {
       companies = ['Stripe', 'Square', 'PayPal', 'Plaid', 'Coinbase', 'Robinhood', 'Chime'];
       roleKeywords = ['VP', 'Director', 'Head', 'Lead', 'Senior', 'Chief', 'Executive'];
@@ -269,8 +309,9 @@ Return ONLY valid JSON in the exact format shown above. No explanatory text befo
       companies = ['Google', 'Microsoft', 'Meta', 'Amazon', 'Apple', 'Netflix', 'Uber'];
       roleKeywords = ['VP', 'Director', 'Head', 'Lead', 'Senior', 'Principal', 'Manager', 'Engineering'];
     } else {
-      // Generic fallback
-      roleKeywords = query.split(' ').filter(word => word.length > 2);
+      // Generic fallback - extract company names and roles from query
+      const words = query.split(/[\s,]+/);
+      roleKeywords = words.filter(word => word.length > 2);
     }
     
     console.log(`Expert search fallback - Query: ${query}, Companies: ${companies.join(',')}, Roles: ${roleKeywords.join(',')}`);
