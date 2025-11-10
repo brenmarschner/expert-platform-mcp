@@ -198,6 +198,31 @@ const mcpTools = [
       required: ['query'],
     },
   },
+  {
+    name: 'request_expert_interview',
+    description: 'Request to schedule interviews with specific experts. Sends notification to team with expert details and research topic. Use this when user wants to actually talk to or schedule time with experts.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        expertIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of expert IDs to request interviews with',
+        },
+        researchTopic: {
+          type: 'string',
+          description: 'What the user wants to discuss with the experts. The research topic or questions they want to explore.',
+        },
+        urgency: {
+          type: 'string',
+          enum: ['low', 'medium', 'high'],
+          description: 'Urgency of the interview request',
+          default: 'medium',
+        },
+      },
+      required: ['expertIds', 'researchTopic'],
+    },
+  },
 ];
 
 // MCP tool handlers are set up below in the POST /mcp endpoint
@@ -972,46 +997,6 @@ app.post('/mcp', async (req, res) => {
               limit: args?.limit || 10,
             };
             result = await handleExpertTool('search_experts', searchParams);
-            
-            // Send Slack notification (non-blocking, don't fail if Slack fails)
-            try {
-              if (result.content && result.content[0]) {
-                const resultText = result.content[0].text;
-                
-                // Extract expert count and details from the formatted result
-                const countMatch = resultText.match(/Found (\d+) experts/);
-                const expertCount = countMatch ? parseInt(countMatch[1]) : 0;
-                
-                if (expertCount > 0) {
-                  // Parse structured data section to get expert details
-                  const structuredMatch = resultText.match(/Structured Data:\n(\{[\s\S]*\})\s*$/);
-                  if (structuredMatch) {
-                    const structured = JSON.parse(structuredMatch[1]);
-                    const experts = structured.experts.slice(0, 5).map((e: any) => ({
-                      name: e.full_name,
-                      company: e.current_company || 'N/A',
-                      title: e.current_title || 'N/A',
-                      linkedin: e.linkedin_url,
-                      background: e.searchable_text
-                    }));
-                    
-                    const slackService = new SlackService();
-                    await slackService.notifyExpertSearch({
-                      query: args?.query || '',
-                      expertCount,
-                      experts,
-                      source: 'ChatGPT MCP'
-                    });
-                    
-                    console.log(`✅ Slack notification sent for ${expertCount} experts`);
-                  }
-                }
-              }
-            } catch (slackError) {
-              console.warn('Slack notification failed (non-critical):', slackError);
-              // Don't fail the search if Slack fails
-            }
-            
             break;
           }
           case 'generate_questions': {
@@ -1064,6 +1049,67 @@ app.post('/mcp', async (req, res) => {
               limit: args?.limit || 20,
             };
             result = await handleInterviewTool('synthesize_interviews', synthesisParams);
+            break;
+          }
+          case 'request_expert_interview': {
+            const expertIds = args?.expertIds || [];
+            const researchTopic = args?.researchTopic || '';
+            const urgency = args?.urgency || 'medium';
+            
+            if (expertIds.length === 0) {
+              throw new Error('At least one expert ID is required');
+            }
+            
+            // Fetch expert details for all requested experts
+            const expertDetails = await Promise.all(
+              expertIds.map(async (id: string) => {
+                const expertResult = await handleExpertTool('get_expert_profile', { expertId: id });
+                if (expertResult.content && expertResult.content[0]) {
+                  try {
+                    const profileData = JSON.parse(expertResult.content[0].text);
+                    return profileData.profile;
+                  } catch (e) {
+                    return null;
+                  }
+                }
+                return null;
+              })
+            );
+            
+            const validExperts = expertDetails.filter(e => e !== null);
+            
+            // Send Slack notification with expert interview request
+            try {
+              const slackService = new SlackService();
+              await slackService.notifyExpertInterviewRequest({
+                experts: validExperts.map((e: any) => ({
+                  name: e.full_name,
+                  company: e.current_company,
+                  title: e.current_title,
+                  linkedin: e.linkedin_url,
+                  background: e.background_summary || e.relevant_job_history
+                })),
+                researchTopic,
+                urgency,
+                source: 'ChatGPT MCP',
+                requestedBy: 'ChatGPT User'
+              });
+              
+              result = {
+                content: [{
+                  type: 'text',
+                  text: `✅ Interview request sent to team!\n\nRequested ${validExperts.length} expert interviews:\n${validExperts.map((e: any) => `- ${e.full_name} (${e.current_company})`).join('\n')}\n\nResearch Topic: ${researchTopic}\n\nYour team will follow up on scheduling these interviews.`
+                }]
+              };
+            } catch (slackError) {
+              result = {
+                content: [{
+                  type: 'text',
+                  text: `⚠️ Interview request created but Slack notification failed: ${slackError instanceof Error ? slackError.message : 'Unknown error'}`
+                }],
+                isError: true
+              };
+            }
             break;
           }
           default:

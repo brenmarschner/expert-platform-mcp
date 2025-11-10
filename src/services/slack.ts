@@ -219,36 +219,37 @@ export class SlackService {
     return remaining > 0 ? `${preview}\n... and ${remaining} more questions` : preview;
   }
 
-  async notifyExpertSearch(data: {
-    query: string;
-    expertCount: number;
+  async notifyExpertInterviewRequest(data: {
     experts: Array<{name: string; company: string; title: string; linkedin?: string; background?: string}>;
+    researchTopic: string;
+    urgency: string;
     source: string;
+    requestedBy: string;
   }): Promise<void> {
-    // Format expert list with LinkedIn links
-    const expertList = data.experts.slice(0, 5).map((e, i) => {
-      let expertText = `${i + 1}. *${e.name}* - ${e.title} at ${e.company}`;
+    const urgencyEmoji = data.urgency === 'high' ? '🔥' : data.urgency === 'medium' ? '⚡' : '📋';
+    
+    // Format expert list with LinkedIn links and background
+    const expertList = data.experts.map((e, i) => {
+      let expertText = `${i + 1}. *${e.name}*\n   ${e.title} at ${e.company}`;
       if (e.linkedin) {
-        expertText += `\n   <${e.linkedin}|LinkedIn Profile>`;
+        expertText += `\n   <${e.linkedin}|View LinkedIn Profile>`;
       }
       if (e.background) {
-        // Show first 150 chars of background
-        const bg = e.background.substring(0, 150).replace(/\n/g, ' ');
+        // Show first 200 chars of background for context
+        const bg = e.background.substring(0, 200).replace(/\n/g, ' ').trim();
         expertText += `\n   _${bg}..._`;
       }
       return expertText;
     }).join('\n\n');
 
-    const moreExperts = data.expertCount > 5 ? `\n\n_...and ${data.expertCount - 5} more experts found_` : '';
-
     const notification: SlackNotification = {
-      text: `Expert Search: "${data.query}" - ${data.expertCount} found`,
+      text: `${urgencyEmoji} Interview Request: ${data.experts.length} experts for "${data.researchTopic}"`,
       blocks: [
         {
           type: 'header',
           text: {
             type: 'plain_text',
-            text: `🔍 Expert Search Request from ChatGPT`
+            text: `${urgencyEmoji} Expert Interview Request`
           }
         },
         {
@@ -256,11 +257,11 @@ export class SlackService {
           fields: [
             {
               type: 'mrkdwn',
-              text: `*Search Query:*\n${data.query}`
+              text: `*Requested By:*\n${data.requestedBy}`
             },
             {
               type: 'mrkdwn',
-              text: `*Results Found:*\n${data.expertCount} experts`
+              text: `*Urgency:*\n${data.urgency.toUpperCase()}`
             }
           ]
         },
@@ -268,7 +269,17 @@ export class SlackService {
           type: 'section',
           text: {
             type: 'mrkdwn',
-            text: `*Research Topic/Intent:*\n${data.query}\n\n*Top Experts Found:*\n${expertList}${moreExperts}`
+            text: `*Research Topic / Discussion Intent:*\n${data.researchTopic}`
+          }
+        },
+        {
+          type: 'divider'
+        },
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*Requested Experts (${data.experts.length}):*\n\n${expertList}`
           }
         },
         {
@@ -287,7 +298,7 @@ export class SlackService {
               type: 'button',
               text: {
                 type: 'plain_text',
-                text: '📧 Start Outreach'
+                text: '✅ Start Outreach'
               },
               style: 'primary',
               value: 'start_outreach'
@@ -299,6 +310,14 @@ export class SlackService {
                 text: '📅 Schedule Interviews'
               },
               value: 'schedule'
+            },
+            {
+              type: 'button',
+              text: {
+                type: 'plain_text',
+                text: '💬 Discuss'
+              },
+              value: 'discuss'
             }
           ]
         }
