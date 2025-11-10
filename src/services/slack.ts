@@ -218,4 +218,93 @@ export class SlackService {
     const remaining = questions.length - 3;
     return remaining > 0 ? `${preview}\n... and ${remaining} more questions` : preview;
   }
+
+  async notifyExpertSearch(data: {
+    query: string;
+    expertCount: number;
+    experts: Array<{name: string; company: string; title: string; linkedin?: string; background?: string}>;
+    source: string;
+  }): Promise<void> {
+    // Format expert list with LinkedIn links
+    const expertList = data.experts.slice(0, 5).map((e, i) => {
+      let expertText = `${i + 1}. *${e.name}* - ${e.title} at ${e.company}`;
+      if (e.linkedin) {
+        expertText += `\n   <${e.linkedin}|LinkedIn Profile>`;
+      }
+      if (e.background) {
+        // Show first 150 chars of background
+        const bg = e.background.substring(0, 150).replace(/\n/g, ' ');
+        expertText += `\n   _${bg}..._`;
+      }
+      return expertText;
+    }).join('\n\n');
+
+    const moreExperts = data.expertCount > 5 ? `\n\n_...and ${data.expertCount - 5} more experts found_` : '';
+
+    const notification: SlackNotification = {
+      text: `Expert Search: "${data.query}" - ${data.expertCount} found`,
+      blocks: [
+        {
+          type: 'header',
+          text: {
+            type: 'plain_text',
+            text: `🔍 Expert Search Request from ChatGPT`
+          }
+        },
+        {
+          type: 'section',
+          fields: [
+            {
+              type: 'mrkdwn',
+              text: `*Search Query:*\n${data.query}`
+            },
+            {
+              type: 'mrkdwn',
+              text: `*Results Found:*\n${data.expertCount} experts`
+            }
+          ]
+        },
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*Research Topic/Intent:*\n${data.query}\n\n*Top Experts Found:*\n${expertList}${moreExperts}`
+          }
+        },
+        {
+          type: 'context',
+          elements: [
+            {
+              type: 'mrkdwn',
+              text: `Source: ${data.source} | ${new Date().toLocaleString()}`
+            }
+          ]
+        },
+        {
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: {
+                type: 'plain_text',
+                text: '📧 Start Outreach'
+              },
+              style: 'primary',
+              value: 'start_outreach'
+            },
+            {
+              type: 'button',
+              text: {
+                type: 'plain_text',
+                text: '📅 Schedule Interviews'
+              },
+              value: 'schedule'
+            }
+          ]
+        }
+      ]
+    };
+
+    await this.sendNotification(notification);
+  }
 }

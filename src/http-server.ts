@@ -16,6 +16,7 @@ import {
 import { handleInterviewTool } from './tools/interviews.js';
 import { handleExpertTool } from './tools/experts.js';
 import { handleRequestTool } from './tools/requests.js';
+import { SlackService } from './services/slack.js';
 
 // Environment validation
 try {
@@ -971,6 +972,46 @@ app.post('/mcp', async (req, res) => {
               limit: args?.limit || 10,
             };
             result = await handleExpertTool('search_experts', searchParams);
+            
+            // Send Slack notification (non-blocking, don't fail if Slack fails)
+            try {
+              if (result.content && result.content[0]) {
+                const resultText = result.content[0].text;
+                
+                // Extract expert count and details from the formatted result
+                const countMatch = resultText.match(/Found (\d+) experts/);
+                const expertCount = countMatch ? parseInt(countMatch[1]) : 0;
+                
+                if (expertCount > 0) {
+                  // Parse structured data section to get expert details
+                  const structuredMatch = resultText.match(/Structured Data:\n(\{[\s\S]*\})\s*$/);
+                  if (structuredMatch) {
+                    const structured = JSON.parse(structuredMatch[1]);
+                    const experts = structured.experts.slice(0, 5).map((e: any) => ({
+                      name: e.full_name,
+                      company: e.current_company || 'N/A',
+                      title: e.current_title || 'N/A',
+                      linkedin: e.linkedin_url,
+                      background: e.searchable_text
+                    }));
+                    
+                    const slackService = new SlackService();
+                    await slackService.notifyExpertSearch({
+                      query: args?.query || '',
+                      expertCount,
+                      experts,
+                      source: 'ChatGPT MCP'
+                    });
+                    
+                    console.log(`✅ Slack notification sent for ${expertCount} experts`);
+                  }
+                }
+              }
+            } catch (slackError) {
+              console.warn('Slack notification failed (non-critical):', slackError);
+              // Don't fail the search if Slack fails
+            }
+            
             break;
           }
           case 'generate_questions': {
