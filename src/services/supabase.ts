@@ -258,6 +258,7 @@ Return ONLY the JSON. No explanatory text.`;
       // Use Anthropic API if available
       const anthropicKey = process.env.ANTHROPIC_API_KEY;
       if (anthropicKey) {
+        console.log(`Calling AI agent for query: "${query}"`);
         const response = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
@@ -275,52 +276,124 @@ Return ONLY the JSON. No explanatory text.`;
         if (response.ok) {
           const result = await response.json();
           const content = result.content[0].text;
-          const parsed = JSON.parse(content);
-          return parsed.searches;
+          console.log(`AI agent raw response: ${content.substring(0, 200)}...`);
+          
+          // Try to parse JSON from the response
+          const jsonMatch = content.match(/\{[\s\S]*"searches"[\s\S]*\}/);
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            console.log(`AI agent generated ${parsed.searches.length} searches`);
+            console.log(`First search - Companies: ${parsed.searches[0].companies.join(', ')}, Roles: ${parsed.searches[0].role_keywords.join(', ')}`);
+            return parsed.searches;
+          } else {
+            console.warn('AI agent response did not contain valid JSON');
+          }
+        } else {
+          console.warn(`AI agent API call failed: ${response.status} ${response.statusText}`);
         }
+      } else {
+        console.warn('No Anthropic API key available');
       }
     } catch (error) {
-      console.warn('AI agent failed, using fallback:', error);
+      console.warn('AI agent exception:', error instanceof Error ? error.message : error);
     }
 
     // Enhanced fallback: smart detection for common patterns
+    console.warn(`Fallback triggered for query: "${query}"`);
+    
     let companies: string[] = [];
     let roleKeywords: string[] = [];
+    let employmentStatus: 'current' | 'former' | 'any' = 'any';
     
+    // Start with explicit parameters
     if (currentCompany) companies.push(currentCompany);
     if (currentTitle) roleKeywords.push(currentTitle);
     
     const queryLower = query.toLowerCase();
     
-    // Smart pattern detection
-    if (queryLower.includes('big 5') || queryLower.includes('executive search firm')) {
-      companies = ['Korn Ferry', 'Russell Reynolds', 'Heidrick & Struggles', 'Spencer Stuart', 'Egon Zehnder'];
-      roleKeywords = ['Partner', 'Principal', 'Director', 'VP', 'Executive Recruiter', 'Managing Director', 'Senior Associate'];
-    } else if (queryLower.includes('consulting')) {
-      companies = ['McKinsey', 'Bain', 'BCG', 'Deloitte', 'PwC', 'EY', 'KPMG'];
-      roleKeywords = ['Partner', 'Principal', 'Director', 'VP', 'Manager', 'Senior Manager'];
-    } else if (queryLower.includes('cdw') || queryLower.includes('shi') || queryLower.includes('insight enterprises') || queryLower.includes('it reseller')) {
-      companies = ['CDW', 'SHI', 'SHI International', 'Insight Enterprises', 'Insight', 'Softchoice', 'Connection', 'PCM'];
-      roleKeywords = ['VP', 'Vice President', 'Director', 'Manager', 'Sales', 'Account', 'Executive'];
-    } else if (queryLower.includes('fintech')) {
-      companies = ['Stripe', 'Square', 'PayPal', 'Plaid', 'Coinbase', 'Robinhood', 'Chime'];
-      roleKeywords = ['VP', 'Director', 'Head', 'Lead', 'Senior', 'Chief', 'Executive'];
-    } else if (queryLower.includes('tech') || queryLower.includes('google') || queryLower.includes('microsoft')) {
-      companies = ['Google', 'Microsoft', 'Meta', 'Amazon', 'Apple', 'Netflix', 'Uber'];
-      roleKeywords = ['VP', 'Director', 'Head', 'Lead', 'Senior', 'Principal', 'Manager', 'Engineering'];
-    } else {
-      // Generic fallback - extract company names and roles from query
-      const words = query.split(/[\s,]+/);
-      roleKeywords = words.filter(word => word.length > 2);
+    // Extract employment status
+    if (queryLower.includes('former') || queryLower.includes('ex-')) {
+      employmentStatus = 'former';
+    } else if (queryLower.includes('current')) {
+      employmentStatus = 'current';
     }
     
-    console.log(`Expert search fallback - Query: ${query}, Companies: ${companies.join(',')}, Roles: ${roleKeywords.join(',')}`);
+    // Pattern detection - ONLY add companies if pattern is EXPLICITLY mentioned
+    if (queryLower.includes('big 5') || queryLower.includes('executive search firm')) {
+      companies = ['Korn Ferry', 'Russell Reynolds', 'Heidrick & Struggles', 'Spencer Stuart', 'Egon Zehnder'];
+      roleKeywords = ['Partner', 'Principal', 'Director', 'VP', 'Executive Recruiter', 'Managing Director'];
+    } else if (queryLower.match(/\b(mckinsey|bain|bcg|deloitte|pwc|accenture)\b/)) {
+      // Only trigger if specific firm mentioned
+      companies = [];
+      if (queryLower.includes('mckinsey')) companies.push('McKinsey', 'McKinsey & Company');
+      if (queryLower.includes('bain')) companies.push('Bain', 'Bain & Company');
+      if (queryLower.includes('bcg')) companies.push('BCG', 'Boston Consulting Group');
+      if (queryLower.includes('deloitte')) companies.push('Deloitte');
+      if (queryLower.includes('pwc')) companies.push('PwC', 'PricewaterhouseCoopers');
+      if (queryLower.includes('accenture')) companies.push('Accenture');
+      if (queryLower.includes('consulting') && companies.length === 0) {
+        companies = ['McKinsey', 'Bain', 'BCG', 'Deloitte', 'PwC'];
+      }
+      roleKeywords = ['Partner', 'Principal', 'Director', 'VP', 'Manager', 'Consultant'];
+    } else if (queryLower.match(/\b(cdw|shi)\b/) || queryLower.includes('insight enterprises')) {
+      // Only trigger for specific IT resellers
+      if (queryLower.includes('cdw')) companies.push('CDW');
+      if (queryLower.includes('shi')) companies.push('SHI', 'SHI International');
+      if (queryLower.includes('insight')) companies.push('Insight', 'Insight Enterprises');
+      roleKeywords = ['VP', 'Director', 'Manager', 'Sales', 'Account', 'Solutions'];
+    } else if (queryLower.match(/\b(stripe|square|paypal|plaid|coinbase)\b/) || queryLower.includes('fintech')) {
+      // Extract specific fintech companies mentioned
+      if (queryLower.includes('stripe')) companies.push('Stripe');
+      if (queryLower.includes('square')) companies.push('Square', 'Block');
+      if (queryLower.includes('paypal')) companies.push('PayPal');
+      if (queryLower.includes('plaid')) companies.push('Plaid');
+      if (queryLower.includes('coinbase')) companies.push('Coinbase');
+      roleKeywords = ['VP', 'Director', 'Head', 'Lead', 'Senior', 'Product', 'Engineering'];
+    } else if (queryLower.match(/\b(google|microsoft|meta|amazon|apple|netflix)\b/)) {
+      // Extract specific tech companies mentioned
+      if (queryLower.includes('google')) companies.push('Google', 'Alphabet');
+      if (queryLower.includes('microsoft')) companies.push('Microsoft');
+      if (queryLower.includes('meta') || queryLower.includes('facebook')) companies.push('Meta', 'Facebook');
+      if (queryLower.includes('amazon')) companies.push('Amazon', 'AWS');
+      if (queryLower.includes('apple')) companies.push('Apple');
+      if (queryLower.includes('netflix')) companies.push('Netflix');
+      roleKeywords = ['VP', 'Director', 'Head', 'Lead', 'Senior', 'Principal', 'Engineering', 'Product'];
+    } else {
+      // TRUE GENERIC FALLBACK - extract what we can from the query
+      // Look for recognizable company names in the query
+      const words = query.split(/[\s,]+/);
+      
+      // Extract potential companies (capitalized words that aren't common roles)
+      const commonRoles = ['VP', 'Director', 'Manager', 'Executive', 'Lead', 'Senior', 'Chief', 'Engineer', 'Product'];
+      words.forEach(word => {
+        const cleaned = word.replace(/[^a-zA-Z]/g, '');
+        if (cleaned.length > 2 && cleaned[0] === cleaned[0].toUpperCase() && !commonRoles.includes(cleaned)) {
+          companies.push(cleaned);
+        }
+      });
+      
+      // Extract role keywords
+      const roleWords = ['engineering', 'product', 'sales', 'marketing', 'executive', 'director', 'manager', 'vp', 'chief', 'ceo', 'cto', 'cio', 'founder', 'architect', 'consultant', 'analyst'];
+      words.forEach(word => {
+        if (roleWords.includes(word.toLowerCase())) {
+          roleKeywords.push(word);
+        }
+      });
+      
+      // If we couldn't extract anything, use broad search
+      if (companies.length === 0 && roleKeywords.length === 0) {
+        roleKeywords = ['VP', 'Director', 'Senior', 'Lead', 'Manager'];
+        console.warn(`⚠️  Could not extract companies or specific roles from: "${query}"`);
+      }
+    }
+    
+    console.log(`Fallback result - Companies: [${companies.join(', ')}], Roles: [${roleKeywords.join(', ')}], Status: ${employmentStatus}`);
     
     return [{
       companies,
       role_keywords: roleKeywords,
-      employment_status: 'any' as const,
-      reasoning: 'Smart fallback search with pattern detection'
+      employment_status: employmentStatus,
+      reasoning: 'Fallback search with pattern detection and extraction'
     }];
   }
 
