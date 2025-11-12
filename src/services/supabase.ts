@@ -216,7 +216,11 @@ export class SupabaseService {
 - "Big 5" → companies: ["Korn Ferry", "Russell Reynolds", "Heidrick & Struggles", "Spencer Stuart", "Egon Zehnder"]
 - "MBB" or "consulting" → companies: ["McKinsey", "Bain", "BCG"]
 
-**Include company name variations:**
+**Include company name variations and expand abbreviations:**
+- "BCG" → ["BCG", "Boston Consulting Group"]
+- "PwC" → ["PwC", "PricewaterhouseCoopers"]
+- "EY" → ["EY", "Ernst & Young"]
+- "AWS" → ["AWS", "Amazon Web Services"]
 - "SHI" → ["SHI", "SHI International", "SHI International Corp"]
 - "Insight" → ["Insight", "Insight Enterprises"]
 - Always include 2-3 name variations for each company
@@ -366,6 +370,31 @@ Return ONLY the JSON. No explanatory text.`;
     if (currentTitle) roleKeywords.push(currentTitle);
     
     const queryLower = query.toLowerCase();
+    
+    // Handle common abbreviations - expand before pattern matching
+    const abbreviations: Record<string, string[]> = {
+      'bcg': ['BCG', 'Boston Consulting Group'],
+      'mbb': ['McKinsey', 'Bain', 'BCG', 'Boston Consulting Group'],
+      'pwc': ['PwC', 'PricewaterhouseCoopers'],
+      'ey': ['EY', 'Ernst & Young', 'Ernst and Young'],
+      'aws': ['AWS', 'Amazon Web Services', 'Amazon'],
+      'gcp': ['GCP', 'Google Cloud', 'Google Cloud Platform'],
+      'ibm': ['IBM', 'International Business Machines'],
+      'ge': ['GE', 'General Electric'],
+      'hp': ['HP', 'Hewlett-Packard', 'Hewlett Packard'],
+      'sap': ['SAP'],
+      'gsı': ['GSI', 'global systems integrator'],
+      'rsi': ['RSI', 'regional systems integrator'],
+      'var': ['VAR', 'value-added reseller']
+    };
+    
+    // Check for abbreviations and expand
+    Object.entries(abbreviations).forEach(([abbr, expansions]) => {
+      if (queryLower.includes(abbr)) {
+        console.log(`Expanding abbreviation: ${abbr} → ${expansions.join(', ')}`);
+        companies.push(...expansions);
+      }
+    });
     
     // Extract employment status
     if (queryLower.includes('former') || queryLower.includes('ex-')) {
