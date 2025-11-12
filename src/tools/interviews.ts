@@ -154,28 +154,53 @@ export async function handleInterviewTool(name: string, arguments_: any): Promis
         }
         
         interviews.forEach((interview, index) => {
-          resultText += `**Insight ${index + 1}:** ${interview.expert_name} (Credibility ${interview.credibility_score}/10)\n\n`;
-          resultText += `${interview.answer_summary}\n\n`;
+          // Extract expert credentials from profile
+          let expertRole = '';
+          let expertCompany = '';
+          let expertBackground = '';
           
-          // Add expert profile for context
           if (interview.expert_profile) {
-            // Extract key info from profile (first 300 chars)
-            const profileSnippet = interview.expert_profile
-              .substring(0, 300)
-              .replace(/\n+/g, ' ')
-              .replace(/\s+/g, ' ')
-              .trim();
-            resultText += `_Expert: ${profileSnippet}..._\n\n`;
+            // Parse the structured profile for key info
+            const profileLines = interview.expert_profile.split('\n');
+            for (const line of profileLines) {
+              if (line.includes('**Current Position:**')) {
+                expertRole = line.replace('**Current Position:**', '').trim();
+              }
+              if (line.includes('**Recent Experience:**')) {
+                const expIndex = profileLines.indexOf(line);
+                if (expIndex + 1 < profileLines.length) {
+                  expertBackground = profileLines[expIndex + 1].trim();
+                }
+              }
+            }
           }
           
+          resultText += `**Insight ${index + 1}**\n\n`;
+          resultText += `"${interview.answer_summary}"\n\n`;
+          resultText += `— **${interview.expert_name}**`;
+          
+          if (expertRole) {
+            resultText += `, ${expertRole}`;
+          }
+          
+          if (expertBackground) {
+            resultText += `\n   ${expertBackground.substring(0, 200)}...`;
+          }
+          
+          resultText += `\n   _Credibility: ${interview.credibility_score}/10 | Consensus: ${interview.consensus_score}/10_\n`;
+          
           if (interview.question_text) {
-            resultText += `_Question: ${interview.question_text}_\n`;
+            resultText += `\n   _Asked: ${interview.question_text}_\n`;
           }
           
           if (index < interviews.length - 1) {
             resultText += `\n---\n\n`;
           }
         });
+        
+        // Explicit citation instruction for ChatGPT
+        resultText += `\n\n📌 **IMPORTANT - Always cite these experts when presenting insights:**\n`;
+        resultText += `When sharing these insights with the user, ALWAYS include the expert's name, role, and company as shown above. These are real expert opinions that must be attributed.`;
         
         // Add next steps
         resultText += `\n\n💡 **What you can do:**\n`;

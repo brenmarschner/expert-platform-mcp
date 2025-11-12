@@ -46,13 +46,13 @@ const mcpServer = new Server(
 const mcpTools = [
   {
     name: 'search_insights',
-    description: 'Search expert interviews for investment diligence insights. Find expert opinions on market dynamics, competitive positioning, business strategy, operational challenges, and industry trends. Returns actual expert quotes with credibility scores. IMPORTANT: Use SHORT, FOCUSED search terms (2-4 keywords) for best results.',
+    description: 'Search expert interviews for investment diligence insights. Returns actual expert quotes with full credentials. CRITICAL: Always cite the expert name, role, and company when presenting results to user. Each insight includes expert background for proper attribution.',
     inputSchema: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
-          description: 'SHORT search terms (2-4 keywords maximum). GOOD: "EASM software", "pricing strategy", "vendor consolidation". BAD: Long sentences or multiple concepts. Use simple, direct terms that would appear in interview questions/answers.',
+          description: 'Search terms for finding expert insights. Examples: "partnership strategy", "vendor consolidation", "pricing", "Big Four". The tool returns expert quotes that MUST be cited with expert credentials.',
         },
         expertName: {
           type: 'string',
