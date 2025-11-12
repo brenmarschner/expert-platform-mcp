@@ -75,11 +75,56 @@ export class SupabaseService {
   }
 
   async searchInterviews(params: InterviewSearchInput): Promise<InterviewMessage[]> {
+    // Use full-text search function if we have a search query
+    if (params.questionTopic) {
+      const sanitizedQuery = params.questionTopic.replace(/[;'"\\]/g, ' ').trim();
+      console.log(`Using full-text search for: "${sanitizedQuery}"`);
+      
+      const { data, error } = await this.interviewsClient
+        .rpc('search_interviews_fulltext', {
+          search_query: sanitizedQuery,
+          result_limit: params.limit || 20
+        });
+
+      if (error) {
+        console.warn('Full-text search failed, falling back to ILIKE:', error);
+        // Fallback to old method if function doesn't exist yet
+        return this.searchInterviewsFallback(params);
+      }
+
+      // Apply additional filters if provided
+      let results = data || [];
+      
+      if (params.expertName) {
+        results = results.filter((r: any) => 
+          r.expert_name?.toLowerCase().includes(params.expertName!.toLowerCase())
+        );
+      }
+
+      if (params.minCredibilityScore) {
+        results = results.filter((r: any) => 
+          (r.credibility_score || 0) >= params.minCredibilityScore!
+        );
+      }
+
+      if (params.minConsensusScore) {
+        results = results.filter((r: any) => 
+          (r.consensus_score || 0) >= params.minConsensusScore!
+        );
+      }
+
+      return results;
+    }
+
+    // No search query - use regular table query
+    return this.searchInterviewsFallback(params);
+  }
+
+  private async searchInterviewsFallback(params: InterviewSearchInput): Promise<InterviewMessage[]> {
     let query = this.interviewsClient
       .from('interview_questions')
       .select('*');
 
-    // Apply filters
     if (params.expertName) {
       query = query.ilike('expert_name', `%${params.expertName}%`);
     }
@@ -89,16 +134,7 @@ export class SupabaseService {
     }
 
     if (params.questionTopic) {
-      // Simple, reliable search - just use the original query
-      // Semantic expansion was causing issues, keep it simple for now
-      const searchTerms = params.questionTopic;
-      
-      // Sanitize to prevent SQL injection
-      const sanitizedTerms = searchTerms.replace(/[;'"\\]/g, ' ').trim();
-      
-      console.log(`Searching for: "${sanitizedTerms}"`);
-      
-      // Search across all 3 key fields for maximum coverage
+      const sanitizedTerms = params.questionTopic.replace(/[;'"\\]/g, ' ').trim();
       query = query.or(`question_text.ilike.%${sanitizedTerms}%,answer_summary.ilike.%${sanitizedTerms}%,expert_profile.ilike.%${sanitizedTerms}%`);
     }
 
