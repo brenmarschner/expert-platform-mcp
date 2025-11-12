@@ -89,14 +89,24 @@ export class SupabaseService {
     }
 
     if (params.questionTopic) {
-      // SEMANTIC SEARCH: Expand query with related terms, synonyms, concepts
-      const semanticTerms = await generateSemanticSearchTerms(params.questionTopic);
+      let searchTerms = params.questionTopic;
+      
+      // Try semantic expansion, but fallback to original if it fails
+      try {
+        const semanticTerms = await generateSemanticSearchTerms(params.questionTopic);
+        if (semanticTerms && semanticTerms.length > 0) {
+          searchTerms = semanticTerms;
+        }
+      } catch (error) {
+        console.warn('Semantic expansion failed, using original query:', error);
+      }
       
       // Sanitize to prevent SQL injection
-      const sanitizedTerms = semanticTerms.replace(/[;'"\\]/g, ' ').trim();
+      const sanitizedTerms = searchTerms.replace(/[;'"\\]/g, ' ').trim();
       
-      // Search across all 3 key fields with expanded semantic terms
-      // This matches the original query AND related concepts/synonyms
+      console.log(`Final search terms: "${sanitizedTerms}"`);
+      
+      // Search across all 3 key fields
       query = query.or(`question_text.ilike.%${sanitizedTerms}%,answer_summary.ilike.%${sanitizedTerms}%,expert_profile.ilike.%${sanitizedTerms}%`);
     }
 
