@@ -497,7 +497,32 @@ Return ONLY the JSON. No explanatory text.`;
   }
 
   async searchExperts(params: ExpertSearchInput): Promise<Expert[]> {
-    // Use AI agent for accurate query interpretation
+    // Check if query looks like a person's name (2-3 words, capitalized, no company indicators)
+    const queryWords = params.query?.split(' ') || [];
+    const looksLikeName = queryWords.length >= 2 && 
+                          queryWords.length <= 4 &&
+                          queryWords.every(w => w[0] === w[0].toUpperCase()) &&
+                          !params.query?.toLowerCase().includes('at ') &&
+                          !params.query?.toLowerCase().includes('from ') &&
+                          !params.query?.toLowerCase().includes('executive') &&
+                          !params.query?.toLowerCase().includes('engineer');
+    
+    if (looksLikeName) {
+      // Direct name search
+      console.log(`Searching by name: "${params.query}"`);
+      const { data, error } = await this.expertsClient
+        .from('experts')
+        .select('*')
+        .ilike('full_name', `%${params.query}%`)
+        .limit(params.limit || 20);
+      
+      if (!error && data && data.length > 0) {
+        return data;
+      }
+      // If name search fails, fall through to company/role search
+    }
+    
+    // Use AI agent for company/role interpretation
     const searches = await this.generateSearchQueries(
       params.query || '', 
       params.currentCompany, 
