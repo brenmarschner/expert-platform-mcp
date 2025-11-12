@@ -107,22 +107,28 @@ export async function handleExpertTool(name: string, arguments_: any): Promise<a
         
         experts.forEach((expert, index) => {
           resultText += `${index + 1}. **${expert.full_name}**\n`;
-          resultText += `   - Current: ${expert.current_title || 'N/A'} at ${expert.current_company || 'N/A'}\n`;
+          resultText += `   Current Role: ${expert.current_title || 'N/A'} at ${expert.current_company || 'N/A'}\n`;
           
-          // ADD SEARCHABLE_TEXT - this is the rich background content
-          if ((expert as any).searchable_text) {
-            resultText += `   - Background: ${(expert as any).searchable_text.substring(0, 300)}...\n`;
+          // Show RELEVANT experience from searchable_text or background_summary
+          const relevantExp = (expert as any).searchable_text || expert.background_summary || expert.relevant_job_history;
+          if (relevantExp) {
+            // Extract first 250 chars and clean up
+            const expText = relevantExp
+              .substring(0, 250)
+              .replace(/\n+/g, ' ')
+              .replace(/\s+/g, ' ')
+              .trim();
+            resultText += `   Relevant Experience: ${expText}...\n`;
+          }
+          
+          if (expert.recent_companies && expert.recent_companies.length > 1) {
+            resultText += `   Career History: ${expert.recent_companies.slice(0, 4).join(' → ')}\n`;
           }
           
           if (expert.location) {
-            resultText += `   - Location: ${expert.location}\n`;
+            resultText += `   Location: ${expert.location}\n`;
           }
-          if (expert.recent_companies && expert.recent_companies.length > 1) {
-            resultText += `   - Recent companies: ${expert.recent_companies.slice(0, 3).join(', ')}\n`;
-          }
-          if (expert.linkedin_url) {
-            resultText += `   - LinkedIn: ${expert.linkedin_url}\n`;
-          }
+          
           resultText += '\n';
         });
         

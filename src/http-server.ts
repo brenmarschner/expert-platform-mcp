@@ -209,6 +209,38 @@ const mcpTools = [
       required: ['expertIds', 'researchTopic'],
     },
   },
+  {
+    name: 'find_similar_experts',
+    description: 'Find experts similar to selected examples. Use this when user wants more experts like the ones they found. Triggers expert sourcing agents to find similar profiles.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        exampleExpertIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'IDs of example experts to find similar profiles to',
+        },
+        additionalCriteria: {
+          type: 'string',
+          description: 'Additional criteria or variations (e.g., "at different companies", "more senior roles", "in Europe")',
+        },
+        quantity: {
+          type: 'number',
+          description: 'How many similar experts to find',
+          default: 10,
+          minimum: 5,
+          maximum: 50,
+        },
+        urgency: {
+          type: 'string',
+          enum: ['low', 'medium', 'high'],
+          description: 'Urgency of sourcing request',
+          default: 'medium',
+        },
+      },
+      required: ['exampleExpertIds'],
+    },
+  },
 ];
 
 // MCP tool handlers are set up below in the POST /mcp endpoint
@@ -1076,7 +1108,7 @@ app.post('/mcp', async (req, res) => {
               result = {
                 content: [{
                   type: 'text',
-                  text: `✅ Interview request sent to team!\n\nRequested ${validExperts.length} expert interviews:\n${validExperts.map((e: any) => `- ${e.full_name} (${e.current_company})`).join('\n')}\n\nResearch Topic: ${researchTopic}\n\nYour team will follow up on scheduling these interviews.`
+                  text: `✅ Expert interview request submitted!\n\n**What happens next:**\n\n1. 🚀 **Immediate outreach** - Our team is reaching out to these experts now:\n${validExperts.map((e: any) => `   - ${e.full_name} (${e.current_company})`).join('\n')}\n\n2. 📧 **Expert contact** - Experts will receive interview invitations within the next 2-4 hours\n\n3. 📊 **Status updates** - You'll receive updates as experts respond:\n   - Initial responses: 24-48 hours\n   - Scheduling confirmations: 3-5 business days\n   - Interview completion: 1-2 weeks\n\n4. 💬 **Interview insights** - Transcripts and insights will be available in the platform immediately after each interview\n\n**Research Topic:** ${researchTopic}\n**Urgency:** ${urgency}\n\nOur team is on it! Check Slack for real-time updates on expert responses.`
                 }]
               };
             } catch (slackError) {
@@ -1084,6 +1116,68 @@ app.post('/mcp', async (req, res) => {
                 content: [{
                   type: 'text',
                   text: `⚠️ Interview request created but Slack notification failed: ${slackError instanceof Error ? slackError.message : 'Unknown error'}`
+                }],
+                isError: true
+              };
+            }
+            break;
+          }
+          case 'find_similar_experts': {
+            const exampleIds = args?.exampleExpertIds || [];
+            const additionalCriteria = args?.additionalCriteria || '';
+            const quantity = args?.quantity || 10;
+            const urgency = args?.urgency || 'medium';
+            
+            if (exampleIds.length === 0) {
+              throw new Error('At least one example expert ID is required');
+            }
+            
+            // Fetch example expert profiles
+            const exampleExperts = await Promise.all(
+              exampleIds.map(async (id: string) => {
+                const expertResult = await handleExpertTool('get_expert_profile', { expertId: id });
+                if (expertResult.content && expertResult.content[0]) {
+                  try {
+                    const profileData = JSON.parse(expertResult.content[0].text);
+                    return profileData.profile;
+                  } catch (e) {
+                    return null;
+                  }
+                }
+                return null;
+              })
+            );
+            
+            const validExamples = exampleExperts.filter(e => e !== null);
+            
+            // Send Slack notification for sourcing request
+            try {
+              const slackService = new SlackService();
+              await slackService.notifySimilarExpertSourcing({
+                exampleExperts: validExamples.map((e: any) => ({
+                  name: e.full_name,
+                  company: e.current_company,
+                  title: e.current_title,
+                  background: e.background_summary || e.relevant_job_history
+                })),
+                additionalCriteria,
+                quantity,
+                urgency,
+                source: 'ChatGPT MCP',
+                requestedBy: 'ChatGPT User'
+              });
+              
+              result = {
+                content: [{
+                  type: 'text',
+                  text: `✅ Expert sourcing request submitted!\n\n**Sourcing similar experts to:**\n${validExamples.map((e: any) => `- ${e.full_name} (${e.current_company})`).join('\n')}\n\n**Quantity requested:** ${quantity} similar experts\n**Additional criteria:** ${additionalCriteria || 'None - find similar profiles'}\n**Urgency:** ${urgency}\n\n**What happens next:**\n\n1. 🔍 **AI sourcing agents activated** - Our team is searching for similar profiles now\n2. 📊 **Expected timeline:**\n   - Initial candidates: 24-48 hours\n   - Full list of ${quantity} experts: 3-5 business days\n3. 📧 **Delivery** - You'll receive candidate profiles via Slack as they're qualified\n\nOur sourcing team is on it! Check Slack for updates.`
+                }]
+              };
+            } catch (slackError) {
+              result = {
+                content: [{
+                  type: 'text',
+                  text: `⚠️ Sourcing request created but Slack notification failed: ${slackError instanceof Error ? slackError.message : 'Unknown error'}`
                 }],
                 isError: true
               };

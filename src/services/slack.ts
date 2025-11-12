@@ -326,4 +326,114 @@ export class SlackService {
 
     await this.sendNotification(notification);
   }
+
+  async notifySimilarExpertSourcing(data: {
+    exampleExperts: Array<{name: string; company: string; title: string; background?: string}>;
+    additionalCriteria: string;
+    quantity: number;
+    urgency: string;
+    source: string;
+    requestedBy: string;
+  }): Promise<void> {
+    const urgencyEmoji = data.urgency === 'high' ? '🔥' : data.urgency === 'medium' ? '⚡' : '📋';
+    
+    const exampleList = data.exampleExperts.map((e, i) => {
+      let text = `${i + 1}. *${e.name}* - ${e.title} at ${e.company}`;
+      if (e.background) {
+        const bg = e.background.substring(0, 150).replace(/\n/g, ' ').trim();
+        text += `\n   _${bg}..._`;
+      }
+      return text;
+    }).join('\n\n');
+
+    const notification: SlackNotification = {
+      text: `${urgencyEmoji} Similar Expert Sourcing: Find ${data.quantity} experts like ${data.exampleExperts[0].name}`,
+      blocks: [
+        {
+          type: 'header',
+          text: {
+            type: 'plain_text',
+            text: `${urgencyEmoji} Expert Sourcing Request - Find Similar Profiles`
+          }
+        },
+        {
+          type: 'section',
+          fields: [
+            {
+              type: 'mrkdwn',
+              text: `*Requested By:*\n${data.requestedBy}`
+            },
+            {
+              type: 'mrkdwn',
+              text: `*Quantity:*\n${data.quantity} similar experts`
+            }
+          ]
+        },
+        {
+          type: 'section',
+          fields: [
+            {
+              type: 'mrkdwn',
+              text: `*Urgency:*\n${data.urgency.toUpperCase()}`
+            },
+            {
+              type: 'mrkdwn',
+              text: `*Additional Criteria:*\n${data.additionalCriteria || 'Find similar profiles'}`
+            }
+          ]
+        },
+        {
+          type: 'divider'
+        },
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*Example Experts to Match:*\n\n${exampleList}`
+          }
+        },
+        {
+          type: 'context',
+          elements: [
+            {
+              type: 'mrkdwn',
+              text: `Source: ${data.source} | ${new Date().toLocaleString()}`
+            }
+          ]
+        },
+        {
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: {
+                type: 'plain_text',
+                text: '🤖 Start AI Sourcing'
+              },
+              style: 'primary',
+              value: 'start_sourcing'
+            },
+            {
+              type: 'button',
+              text: {
+                type: 'plain_text',
+                text: '👥 Manual Search'
+              },
+              value: 'manual_search'
+            },
+            {
+              type: 'button',
+              text: {
+                type: 'plain_text',
+                text: '💬 Discuss Criteria'
+              },
+              value: 'discuss'
+            }
+          ]
+        }
+      ]
+    };
+
+    await this.sendNotification(notification);
+  }
 }
