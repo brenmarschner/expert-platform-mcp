@@ -157,20 +157,6 @@ const mcpTools = [
     },
   },
   {
-    name: 'get_full_interview',
-    description: 'Get complete interview transcript and summary by meeting ID. Returns all questions and answers from a single interview session with expert profile.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        meetingId: {
-          type: 'string',
-          description: 'The meeting ID of the interview to retrieve (e.g., "98302656417")',
-        },
-      },
-      required: ['meetingId'],
-    },
-  },
-  {
     name: 'synthesize_insights',
     description: 'Synthesize and summarize expert insights across multiple interviews on a topic. Aggregates expert opinions, identifies consensus and dissent, and provides credibility-weighted analysis.',
     inputSchema: {
@@ -1032,14 +1018,6 @@ app.post('/mcp', async (req, res) => {
             } else {
               throw new Error('Either expertId or expertName is required');
             }
-            break;
-          }
-          case 'get_full_interview': {
-            const meetingId = args?.meetingId;
-            if (!meetingId) {
-              throw new Error('meetingId is required');
-            }
-            result = await handleInterviewTool('get_full_interview', { meetingId });
             break;
           }
           case 'synthesize_insights': {

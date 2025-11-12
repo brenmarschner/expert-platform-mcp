@@ -27,7 +27,7 @@ export class SupabaseService {
 
   async searchInterviews(params: InterviewSearchInput): Promise<InterviewMessage[]> {
     let query = this.interviewsClient
-      .from('interview_messages')
+      .from('interview_questions')
       .select('*');
 
     // Apply filters
@@ -64,8 +64,8 @@ export class SupabaseService {
       // Sanitize the search term to prevent SQL injection
       const sanitizedTopic = searchTerms.replace(/[;'"\\]/g, ' ').trim();
       
-      // Use OR search for flexibility - matches if ANY term is found
-      query = query.or(`question_text.ilike.%${sanitizedTopic}%,answer_summary.ilike.%${sanitizedTopic}%`);
+      // Search across all 3 key fields for maximum coverage
+      query = query.or(`question_text.ilike.%${sanitizedTopic}%,answer_summary.ilike.%${sanitizedTopic}%,expert_profile.ilike.%${sanitizedTopic}%`);
     }
 
     if (params.dateFrom) {
@@ -92,20 +92,6 @@ export class SupabaseService {
 
     if (error) {
       throw new Error(`Failed to search interviews: ${error.message}`);
-    }
-
-    return data || [];
-  }
-
-  async getFullInterview(meetingId: string): Promise<InterviewMessage[]> {
-    const { data, error } = await this.interviewsClient
-      .from('interview_messages')
-      .select('*')
-      .eq('meeting_id', meetingId)
-      .order('created_at', { ascending: true });
-
-    if (error) {
-      throw new Error(`Failed to get full interview: ${error.message}`);
     }
 
     return data || [];
@@ -399,7 +385,7 @@ Return ONLY the JSON. No explanatory text.`;
 
   async getExpertInterviewHistory(expertId: number): Promise<InterviewMessage[]> {
     const { data, error } = await this.interviewsClient
-      .from('interview_messages')
+      .from('interview_questions')
       .select('*')
       .eq('expert_id', expertId)
       .order('created_at', { ascending: false });

@@ -129,21 +129,6 @@ export const interviewTools: Tool[] = [
       },
       required: ['expertId']
     }
-  },
-  {
-    name: 'get_full_interview',
-    description: 'Get complete interview transcript and summary by meeting ID. Returns all questions and answers from a single interview session.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        meetingId: {
-          type: 'string',
-          description: 'The meeting ID of the interview to retrieve',
-          required: true
-        }
-      },
-      required: ['meetingId']
-    }
   }
 ];
 
@@ -464,61 +449,6 @@ Return a well-structured analysis in markdown format.`;
                   project_id: interview.project_id
                 }))
               }, null, 2)
-            }
-          ]
-        };
-      }
-
-      case 'get_full_interview': {
-        const meetingId = arguments_.meetingId;
-        if (typeof meetingId !== 'string') {
-          throw new Error('meetingId must be a string');
-        }
-        
-        const interviews = await supabase.getFullInterview(meetingId);
-        
-        if (interviews.length === 0) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: `No interview found with meeting ID: ${meetingId}`
-              }
-            ]
-          };
-        }
-
-        // Group by expert and create summary
-        const expertName = interviews[0].expert_name;
-        const expertProfile = interviews[0].expert_profile;
-        const projectId = interviews[0].project_id;
-        
-        const summary = {
-          meeting_id: meetingId,
-          expert_name: expertName,
-          expert_profile: expertProfile,
-          project_id: projectId,
-          total_questions: interviews.length,
-          interview_date: interviews[0].created_at,
-          questions_and_answers: interviews.map(interview => ({
-            question: interview.question_text,
-            answer: interview.answer_summary,
-            consensus_score: interview.consensus_score,
-            credibility_score: interview.credibility_score,
-            completion_score: interview.completion_score
-          })),
-          overall_quality: {
-            avg_consensus_score: interviews.filter(i => i.consensus_score).reduce((sum, i) => sum + i.consensus_score!, 0) / interviews.filter(i => i.consensus_score).length || 0,
-            avg_credibility_score: interviews.filter(i => i.credibility_score).reduce((sum, i) => sum + i.credibility_score!, 0) / interviews.filter(i => i.credibility_score).length || 0,
-            avg_completion_score: interviews.filter(i => i.completion_score).reduce((sum, i) => sum + i.completion_score!, 0) / interviews.filter(i => i.completion_score).length || 0
-          }
-        };
-        
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(summary, null, 2)
             }
           ]
         };
