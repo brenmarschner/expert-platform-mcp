@@ -157,8 +157,19 @@ export async function handleInterviewTool(name: string, arguments_: any): Promis
           resultText += `**Insight ${index + 1}:** ${interview.expert_name} (Credibility ${interview.credibility_score}/10)\n\n`;
           resultText += `${interview.answer_summary}\n\n`;
           
+          // Add expert profile for context
+          if (interview.expert_profile) {
+            // Extract key info from profile (first 300 chars)
+            const profileSnippet = interview.expert_profile
+              .substring(0, 300)
+              .replace(/\n+/g, ' ')
+              .replace(/\s+/g, ' ')
+              .trim();
+            resultText += `_Expert: ${profileSnippet}..._\n\n`;
+          }
+          
           if (interview.question_text) {
-            resultText += `_Context: ${interview.question_text}_\n`;
+            resultText += `_Question: ${interview.question_text}_\n`;
           }
           
           if (index < interviews.length - 1) {
