@@ -1,6 +1,10 @@
 # Expert Platform MCP Server
 
-An MCP (Model Context Protocol) server that connects to your expert platform's Supabase database and Slack workspace to enable AI-powered interview management, expert discovery, and team collaboration.
+AI-powered expert research platform integrated with ChatGPT Enterprise for investment diligence. Provides expert insights search, expert discovery, AI-powered synthesis, and Slack-integrated interview scheduling.
+
+**🚀 Live Production:** https://expert-platform-mcp-1.onrender.com  
+**📚 Quick Start:** See [COLLABORATOR-GUIDE.md](COLLABORATOR-GUIDE.md)  
+**🤖 ChatGPT Setup:** See [CHATGPT-INTEGRATION.md](CHATGPT-INTEGRATION.md)
 
 ## Features
 
