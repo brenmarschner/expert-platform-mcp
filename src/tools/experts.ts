@@ -102,51 +102,40 @@ export async function handleExpertTool(name: string, arguments_: any): Promise<a
         const params = ExpertSearchSchema.parse(arguments_);
         const experts = await supabase.searchExperts(params);
         
-        // Format results in a user-friendly way for ChatGPT to display
-        let resultText = `Found ${experts.length} experts matching "${params.query}":\n\n`;
+        // Format for ChatGPT with clear structure
+        let resultText = `📊 EXPERT SEARCH RESULTS\n\nFound ${experts.length} expert${experts.length !== 1 ? 's' : ''} matching: "${params.query}"\n\n`;
         
-        experts.forEach((expert, index) => {
-          resultText += `${index + 1}. **${expert.full_name}**\n`;
-          resultText += `   Current Role: ${expert.current_title || 'N/A'} at ${expert.current_company || 'N/A'}\n`;
+        if (experts.length === 0) {
+          resultText += `No experts found. Try:\n- Broader search terms\n- Different companies\n- Name search (e.g., "Adam Ortiz")\n- Abbreviations (BCG, MBB, PwC)`;
+        } else {
+          experts.forEach((expert, index) => {
+            resultText += `${index + 1}. **${expert.full_name}**\n`;
+            resultText += `   • ${expert.current_title || 'N/A'} at ${expert.current_company || 'N/A'}\n`;
+            
+            // Show RELEVANT experience
+            const relevantExp = (expert as any).searchable_text || expert.background_summary || expert.relevant_job_history;
+            if (relevantExp) {
+              const expText = relevantExp
+                .substring(0, 200)
+                .replace(/\n+/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+              resultText += `   • ${expText}...\n`;
+            }
+            
+            if (expert.recent_companies && expert.recent_companies.length > 1) {
+              resultText += `   • Career: ${expert.recent_companies.slice(0, 3).join(' → ')}\n`;
+            }
+            
+            resultText += '\n';
+          });
           
-          // Show RELEVANT experience from searchable_text or background_summary
-          const relevantExp = (expert as any).searchable_text || expert.background_summary || expert.relevant_job_history;
-          if (relevantExp) {
-            // Extract first 250 chars and clean up
-            const expText = relevantExp
-              .substring(0, 250)
-              .replace(/\n+/g, ' ')
-              .replace(/\s+/g, ' ')
-              .trim();
-            resultText += `   Relevant Experience: ${expText}...\n`;
-          }
-          
-          if (expert.recent_companies && expert.recent_companies.length > 1) {
-            resultText += `   Career History: ${expert.recent_companies.slice(0, 4).join(' → ')}\n`;
-          }
-          
-          if (expert.location) {
-            resultText += `   Location: ${expert.location}\n`;
-          }
-          
-          resultText += '\n';
-        });
-        
-        // Also include structured data for programmatic access
-        resultText += `\n---\nStructured Data:\n${JSON.stringify({
-          total_results: experts.length,
-          search_query: params.query,
-          experts: experts.map(expert => ({
-            id: expert.id,
-            full_name: expert.full_name,
-            current_company: expert.current_company,
-            current_title: expert.current_title,
-            location: expert.location,
-            linkedin_url: expert.linkedin_url,
-            recent_companies: expert.recent_companies,
-            recent_titles: expert.recent_titles
-          }))
-        }, null, 2)}`;
+          // Add clear next steps
+          resultText += `\n💡 **Next Steps:**\n`;
+          resultText += `- Request interviews: "Schedule interview with [name] about [topic]"\n`;
+          resultText += `- Get more details: "Tell me more about [name]"\n`;
+          resultText += `- Find similar: "Find 10 more experts like [name]"`;
+        }
         
         return {
           content: [

@@ -139,24 +139,38 @@ export async function handleInterviewTool(name: string, arguments_: any): Promis
         const params = InterviewSearchSchema.parse(arguments_);
         const interviews = await supabase.searchInterviews(params);
         
-        // Format results for ChatGPT display
-        let resultText = `Found ${interviews.length} expert insights:\n\n`;
+        // Format for ChatGPT with clear structure
+        let resultText = `💡 EXPERT INSIGHTS\n\nFound ${interviews.length} expert insight${interviews.length !== 1 ? 's' : ''} on: "${params.questionTopic}"\n\n`;
+        
+        if (interviews.length === 0) {
+          resultText += `No insights found on this topic.\n\nTry:\n- Broader search terms\n- Related concepts (e.g., "partnerships" instead of "alliances")\n- Different keywords`;
+          
+          return {
+            content: [{
+              type: 'text',
+              text: resultText
+            }]
+          };
+        }
         
         interviews.forEach((interview, index) => {
-          // FOCUS ON ANSWER_SUMMARY as the primary content
-          resultText += `**${interview.expert_name}** (Credibility: ${interview.credibility_score}/10):\n`;
+          resultText += `**Insight ${index + 1}:** ${interview.expert_name} (Credibility ${interview.credibility_score}/10)\n\n`;
           resultText += `${interview.answer_summary}\n\n`;
           
-          // Context in smaller text
           if (interview.question_text) {
-            resultText += `*Question asked: ${interview.question_text}*\n`;
+            resultText += `_Context: ${interview.question_text}_\n`;
           }
-          resultText += `*Consensus score: ${interview.consensus_score}/10*\n\n`;
           
           if (index < interviews.length - 1) {
-            resultText += `---\n\n`;
+            resultText += `\n---\n\n`;
           }
         });
+        
+        // Add next steps
+        resultText += `\n\n💡 **What you can do:**\n`;
+        resultText += `- Search for more: "Find more insights on [topic]"\n`;
+        resultText += `- Request interviews: "Schedule call with [expert name]"\n`;
+        resultText += `- Related topics: Try searching for related concepts`;
         
         return {
           content: [
