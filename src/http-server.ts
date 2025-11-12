@@ -46,13 +46,13 @@ const mcpServer = new Server(
 const mcpTools = [
   {
     name: 'search_insights',
-    description: 'Search expert interviews for investment diligence insights. Returns actual expert quotes with full credentials. CRITICAL: Always cite the expert name, role, and company when presenting results to user. Each insight includes expert background for proper attribution.',
+    description: 'PRIMARY research tool for investment diligence. Use FIRST when user asks about any business topic. Returns expert quotes with full credentials. CRITICAL: Present as "According to [Expert Name], [Role] at [Company] (Credibility: X/10): [quote]". After showing insights, SUGGEST: "Would you like to find experts to interview on this topic?"',
     inputSchema: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
-          description: 'Search terms for finding expert insights. Examples: "partnership strategy", "vendor consolidation", "pricing", "Big Four". The tool returns expert quotes that MUST be cited with expert credentials.',
+          description: 'Business topic or question. Examples: "partnership strategy", "vendor consolidation", "pricing", "Big Four", "customer stickiness". Returns expert opinions that MUST be attributed with expert name, role, and company.',
         },
         expertName: {
           type: 'string',
@@ -77,13 +77,13 @@ const mcpTools = [
   },
   {
     name: 'search_experts',
-    description: 'Find current and former employees of specific companies by role. Optimized for sourcing experts with experience at target companies for interviews and research. Uses AI to map queries to company + role combinations.',
+    description: 'Find experts by NAME, company, or role. Supports: (1) Name search ("Adam Ortiz", "Ellen Newhouse"), (2) Company with abbreviations (BCG→Boston Consulting Group, MBB, PwC), (3) Role ("consultants", "VPs"). Use when user asks for experts OR after showing insights. AUTOMATICALLY also call launch_expert_sourcing to recruit NEW experts externally. Present database results immediately + explain external sourcing launched.',
     inputSchema: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
-          description: 'Description of experts to find, focusing on company + role combinations. Examples: "former Google product managers", "current Stripe executives", "McKinsey consultants", "healthcare startup founders", "enterprise sales leaders at Salesforce"',
+          description: 'Expert name ("Ellen Newhouse"), company (supports BCG, MBB, PwC abbreviations), role ("engineers", "consultants"), or combination ("BCG consultants", "former Google VPs"). AI auto-expands abbreviations and maps to companies/roles.',
         },
         currentCompany: {
           type: 'string',
@@ -110,13 +110,13 @@ const mcpTools = [
   },
   {
     name: 'generate_questions',
-    description: 'Generate interview questions for a specific topic or expert type. Useful for creating interview guides.',
+    description: 'Generate interview questions for research topics. Use AFTER finding experts or BEFORE requesting interviews to prepare. Triggers: "create questions about", "prepare interview for", "what should I ask". Creates categorized questions (background, technical, opinion, scenario) with follow-ups.',
     inputSchema: {
       type: 'object',
       properties: {
         topic: {
           type: 'string',
-          description: 'The main topic or research area (e.g., "fintech regulatory challenges", "AI in healthcare")',
+          description: 'Research topic for interview questions. Examples: "GSI partnerships", "vendor consolidation", "pricing strategy", "Big Four differentiation". User phrases: "create questions about X", "what should I ask about Y".',
         },
         expertBackground: {
           type: 'string',
@@ -140,36 +140,19 @@ const mcpTools = [
     },
   },
   {
-    name: 'fetch_profile',
-    description: 'Get detailed expert profile and background information by expert ID or name.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        expertId: {
-          type: 'string',
-          description: 'Expert UUID to fetch detailed profile',
-        },
-        expertName: {
-          type: 'string',
-          description: 'Expert name to search and fetch profile',
-        },
-      },
-    },
-  },
-  {
     name: 'request_expert_interview',
-    description: 'Request to schedule interviews with specific experts. Sends notification to team with expert details and research topic. Use this when user wants to actually talk to or schedule time with experts.',
+    description: 'Schedule expert interviews. Triggers: "schedule interview", "talk to [expert]", "interview [expert] about", "contact [expert]", "set up call with". Sends immediate team notification with 2-4 hour expert contact time. REQUIRED: Extract research topic from user request. After calling, confirm scheduling and explain timeline.',
     inputSchema: {
       type: 'object',
       properties: {
         expertIds: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Array of expert IDs to request interviews with',
+          description: 'Expert IDs from search_experts results. Extract from the expert list shown to user. Multiple IDs allowed for group interviews.',
         },
         researchTopic: {
           type: 'string',
-          description: 'What the user wants to discuss with the experts. The research topic or questions they want to explore.',
+          description: 'CRITICAL: What user wants to discuss with experts. Extract from user request. Examples: "vendor consolidation strategies", "pricing models in SaaS", "GSI partnership best practices". This goes directly to the expert.',
         },
         urgency: {
           type: 'string',
@@ -182,35 +165,33 @@ const mcpTools = [
     },
   },
   {
-    name: 'find_similar_experts',
-    description: 'Request external expert sourcing to find NEW experts (not in database) similar to selected examples. Triggers AI sourcing agents to recruit similar profiles from LinkedIn/external sources. Use when user wants to expand beyond current database.',
+    name: 'launch_expert_sourcing',
+    description: 'Launch EXTERNAL recruitment for NEW experts from LinkedIn/external sources. AUTOMATICALLY call this WHENEVER you use search_experts - this is proactive expert sourcing. Recruits experts similar to search results. Tell user: "Also launched external sourcing - you\'ll receive Slack notifications about new expert candidates in 3-7 days." This supplements database search with active recruitment.',
     inputSchema: {
       type: 'object',
       properties: {
+        searchQuery: {
+          type: 'string',
+          description: 'The original expert search query to use as sourcing criteria. Copy from search_experts query parameter.',
+        },
         exampleExpertIds: {
           type: 'array',
           items: { type: 'string' },
-          description: 'IDs of example experts from search results to use as reference profiles',
+          description: 'Optional: IDs of experts from search_experts results to use as reference profiles. If provided, recruits similar experts.',
         },
         additionalCriteria: {
           type: 'string',
-          description: 'Additional sourcing criteria or variations (e.g., "at different companies", "more senior roles", "currently in EMEA", "from competitors")',
+          description: 'Optional: Additional sourcing criteria from user (e.g., "at different companies", "more senior", "in Europe"). Use if user specified variations.',
         },
         quantity: {
           type: 'number',
-          description: 'How many NEW external experts to source and recruit',
+          description: 'How many NEW external experts to recruit. Default 10 unless user specifies.',
           default: 10,
           minimum: 5,
           maximum: 50,
         },
-        urgency: {
-          type: 'string',
-          enum: ['low', 'medium', 'high'],
-          description: 'Urgency of external sourcing/recruitment request',
-          default: 'medium',
-        },
       },
-      required: ['exampleExpertIds'],
+      required: ['searchQuery'],
     },
   },
 ];
@@ -999,31 +980,6 @@ app.post('/mcp', async (req, res) => {
             result = await handleRequestTool('generate_interview_questions', questionParams);
             break;
           }
-          case 'fetch_profile': {
-            if (args?.expertId) {
-              result = await handleExpertTool('get_expert_profile', { expertId: args.expertId });
-            } else if (args?.expertName) {
-              const searchResult = await handleExpertTool('search_experts', { 
-                query: args.expertName, 
-                limit: 1 
-              });
-              
-              if (searchResult.content && searchResult.content[0]) {
-                const searchData = JSON.parse(searchResult.content[0].text);
-                if (searchData.data && searchData.data.experts && searchData.data.experts.length > 0) {
-                  const expertId = searchData.data.experts[0].id;
-                  result = await handleExpertTool('get_expert_profile', { expertId });
-                } else {
-                  result = {
-                    content: [{ type: 'text', text: `Expert "${args.expertName}" not found.` }]
-                  };
-                }
-              }
-            } else {
-              throw new Error('Either expertId or expertName is required');
-            }
-            break;
-          }
           case 'request_expert_interview': {
             const expertIds = args?.expertIds || [];
             const researchTopic = args?.researchTopic || '';
@@ -1085,14 +1041,16 @@ app.post('/mcp', async (req, res) => {
             }
             break;
           }
-          case 'find_similar_experts': {
+          case 'launch_expert_sourcing': {
             const exampleIds = args?.exampleExpertIds || [];
+            const searchContext = args?.searchContext || args?.searchQuery || '';
             const additionalCriteria = args?.additionalCriteria || '';
             const quantity = args?.quantity || 10;
             const urgency = args?.urgency || 'medium';
             
-            if (exampleIds.length === 0) {
-              throw new Error('At least one example expert ID is required');
+            // Can work with either example IDs or search context
+            if (exampleIds.length === 0 && !searchContext) {
+              throw new Error('Provide either example expert IDs or search context');
             }
             
             // Fetch example expert profiles
