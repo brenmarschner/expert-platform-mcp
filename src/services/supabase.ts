@@ -89,24 +89,16 @@ export class SupabaseService {
     }
 
     if (params.questionTopic) {
-      let searchTerms = params.questionTopic;
-      
-      // Try semantic expansion, but fallback to original if it fails
-      try {
-        const semanticTerms = await generateSemanticSearchTerms(params.questionTopic);
-        if (semanticTerms && semanticTerms.length > 0) {
-          searchTerms = semanticTerms;
-        }
-      } catch (error) {
-        console.warn('Semantic expansion failed, using original query:', error);
-      }
+      // Simple, reliable search - just use the original query
+      // Semantic expansion was causing issues, keep it simple for now
+      const searchTerms = params.questionTopic;
       
       // Sanitize to prevent SQL injection
       const sanitizedTerms = searchTerms.replace(/[;'"\\]/g, ' ').trim();
       
-      console.log(`Final search terms: "${sanitizedTerms}"`);
+      console.log(`Searching for: "${sanitizedTerms}"`);
       
-      // Search across all 3 key fields
+      // Search across all 3 key fields for maximum coverage
       query = query.or(`question_text.ilike.%${sanitizedTerms}%,answer_summary.ilike.%${sanitizedTerms}%,expert_profile.ilike.%${sanitizedTerms}%`);
     }
 
