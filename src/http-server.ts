@@ -183,22 +183,22 @@ const mcpTools = [
   },
   {
     name: 'find_similar_experts',
-    description: 'Find experts similar to selected examples. Use this when user wants more experts like the ones they found. Triggers expert sourcing agents to find similar profiles.',
+    description: 'Request external expert sourcing to find NEW experts (not in database) similar to selected examples. Triggers AI sourcing agents to recruit similar profiles from LinkedIn/external sources. Use when user wants to expand beyond current database.',
     inputSchema: {
       type: 'object',
       properties: {
         exampleExpertIds: {
           type: 'array',
           items: { type: 'string' },
-          description: 'IDs of example experts to find similar profiles to',
+          description: 'IDs of example experts from search results to use as reference profiles',
         },
         additionalCriteria: {
           type: 'string',
-          description: 'Additional criteria or variations (e.g., "at different companies", "more senior roles", "in Europe")',
+          description: 'Additional sourcing criteria or variations (e.g., "at different companies", "more senior roles", "currently in EMEA", "from competitors")',
         },
         quantity: {
           type: 'number',
-          description: 'How many similar experts to find',
+          description: 'How many NEW external experts to source and recruit',
           default: 10,
           minimum: 5,
           maximum: 50,
@@ -206,7 +206,7 @@ const mcpTools = [
         urgency: {
           type: 'string',
           enum: ['low', 'medium', 'high'],
-          description: 'Urgency of sourcing request',
+          description: 'Urgency of external sourcing/recruitment request',
           default: 'medium',
         },
       },
@@ -1133,7 +1133,7 @@ app.post('/mcp', async (req, res) => {
               result = {
                 content: [{
                   type: 'text',
-                  text: `✅ Expert sourcing request submitted!\n\n**Sourcing similar experts to:**\n${validExamples.map((e: any) => `- ${e.full_name} (${e.current_company})`).join('\n')}\n\n**Quantity requested:** ${quantity} similar experts\n**Additional criteria:** ${additionalCriteria || 'None - find similar profiles'}\n**Urgency:** ${urgency}\n\n**What happens next:**\n\n1. 🔍 **AI sourcing agents activated** - Our team is searching for similar profiles now\n2. 📊 **Expected timeline:**\n   - Initial candidates: 24-48 hours\n   - Full list of ${quantity} experts: 3-5 business days\n3. 📧 **Delivery** - You'll receive candidate profiles via Slack as they're qualified\n\nOur sourcing team is on it! Check Slack for updates.`
+                  text: `✅ External expert sourcing request submitted!\n\n**Finding NEW experts similar to:**\n${validExamples.map((e: any) => `- ${e.full_name} (${e.current_company})`).join('\n')}\n\n**Sourcing target:** ${quantity} new external candidates\n**Additional criteria:** ${additionalCriteria || 'Find similar profiles from LinkedIn/external sources'}\n**Urgency:** ${urgency}\n\n**What happens next:**\n\n1. 🤖 **AI sourcing agents activated** - Searching LinkedIn, company databases, and networks for similar profiles\n2. 🔍 **External recruitment** - Finding experts NOT in our current database\n3. 📊 **Expected timeline:**\n   - Initial candidates identified: 24-48 hours\n   - Qualified profiles (${quantity} experts): 3-7 business days\n   - Vetting and outreach: Ongoing\n4. 📧 **Delivery** - Candidate profiles delivered via Slack as they're sourced and qualified\n\n**Note:** This is external sourcing - we're recruiting NEW experts from outside our database.\n\nOur AI sourcing team is on it! Check Slack for candidate updates.`
                 }]
               };
             } catch (slackError) {

@@ -347,13 +347,20 @@ export class SlackService {
     }).join('\n\n');
 
     const notification: SlackNotification = {
-      text: `${urgencyEmoji} Similar Expert Sourcing: Find ${data.quantity} experts like ${data.exampleExperts[0].name}`,
+      text: `${urgencyEmoji} EXTERNAL Expert Sourcing: Find ${data.quantity} NEW experts like ${data.exampleExperts[0].name}`,
       blocks: [
         {
           type: 'header',
           text: {
             type: 'plain_text',
-            text: `${urgencyEmoji} Expert Sourcing Request - Find Similar Profiles`
+            text: `${urgencyEmoji} EXTERNAL Expert Sourcing - Recruit NEW Profiles`
+          }
+        },
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `*🔍 External Recruitment Request*\nSource NEW experts from LinkedIn and external databases (not in our current system)`
           }
         },
         {
