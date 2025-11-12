@@ -3,6 +3,55 @@ import { env } from '../config/environment.js';
 import type { InterviewMessage, Expert } from '../types/schema.js';
 import type { InterviewSearchInput, ExpertSearchInput } from '../utils/validation.js';
 
+// Generate semantic search terms using AI
+async function generateSemanticSearchTerms(query: string): Promise<string> {
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  
+  if (!anthropicKey) {
+    return query; // Fallback to original query
+  }
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': anthropicKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 150,
+        messages: [{
+          role: 'user',
+          content: `You are a semantic search query expander. Given a search query, generate 5-10 related terms, synonyms, and semantically similar concepts that would help find relevant content.
+
+Query: "${query}"
+
+Return a space-separated list of search terms including:
+- The original terms
+- Synonyms (e.g., "vendor" → "supplier", "provider")
+- Related concepts (e.g., "consolidation" → "centralization", "integration", "streamlining")
+- Industry variations (e.g., "partnership" → "alliance", "collaboration", "relationship")
+
+Return ONLY the search terms, nothing else.`
+        }]
+      })
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      const expandedTerms = result.content[0].text.trim();
+      console.log(`Semantic expansion: "${query}" → "${expandedTerms}"`);
+      return expandedTerms;
+    }
+  } catch (error) {
+    console.warn('Semantic search expansion failed:', error);
+  }
+  
+  return query;
+}
+
 export class SupabaseService {
   private interviewsClient;
   private expertsClient;
@@ -40,32 +89,15 @@ export class SupabaseService {
     }
 
     if (params.questionTopic) {
-      // Extract key terms from verbose queries
-      let searchTerms = params.questionTopic;
+      // SEMANTIC SEARCH: Expand query with related terms, synonyms, concepts
+      const semanticTerms = await generateSemanticSearchTerms(params.questionTopic);
       
-      // If query is too long (>50 chars), extract key terms
-      if (searchTerms.length > 50) {
-        // Remove parenthetical content like (EASM) first
-        searchTerms = searchTerms.replace(/\([^)]*\)/g, ' ');
-        
-        // Remove common filler words and extract meaningful terms
-        const fillerWords = ['interviews', 'with', 'customers', 'of', 'the', 'and', 'or', 'about', 'for', 'in', 'on', 'at', 'to', 'from', 'all', 'find', 'search', 'please', 'me', 'that', 'this', 'what', 'how', 'why', 'software', 'process'];
-        const words = searchTerms.toLowerCase().split(/[\s,;.!?]+/);
-        const keyWords = words.filter(word => 
-          word.length > 3 && 
-          !fillerWords.includes(word)
-        );
-        
-        // Take first 3-4 meaningful words for focused search
-        searchTerms = keyWords.slice(0, 4).join(' ');
-        console.log(`Extracted key terms: "${params.questionTopic}" → "${searchTerms}"`);
-      }
+      // Sanitize to prevent SQL injection
+      const sanitizedTerms = semanticTerms.replace(/[;'"\\]/g, ' ').trim();
       
-      // Sanitize the search term to prevent SQL injection
-      const sanitizedTopic = searchTerms.replace(/[;'"\\]/g, ' ').trim();
-      
-      // Search across all 3 key fields for maximum coverage
-      query = query.or(`question_text.ilike.%${sanitizedTopic}%,answer_summary.ilike.%${sanitizedTopic}%,expert_profile.ilike.%${sanitizedTopic}%`);
+      // Search across all 3 key fields with expanded semantic terms
+      // This matches the original query AND related concepts/synonyms
+      query = query.or(`question_text.ilike.%${sanitizedTerms}%,answer_summary.ilike.%${sanitizedTerms}%,expert_profile.ilike.%${sanitizedTerms}%`);
     }
 
     if (params.dateFrom) {
