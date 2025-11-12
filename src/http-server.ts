@@ -157,34 +157,6 @@ const mcpTools = [
     },
   },
   {
-    name: 'synthesize_insights',
-    description: 'Synthesize and summarize expert insights across multiple interviews on a topic. Aggregates expert opinions, identifies consensus and dissent, and provides credibility-weighted analysis.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        query: {
-          type: 'string',
-          description: 'Investment diligence topic to synthesize insights about. Examples: "vendor consolidation strategies", "pricing approaches", "competitive differentiation"',
-        },
-        minCredibilityScore: {
-          type: 'number',
-          description: 'Minimum expert credibility score (0-10) to include. Default 7 for high-quality synthesis.',
-          default: 7,
-          minimum: 0,
-          maximum: 10,
-        },
-        limit: {
-          type: 'number',
-          description: 'Maximum number of expert interviews to analyze',
-          default: 20,
-          minimum: 5,
-          maximum: 50,
-        },
-      },
-      required: ['query'],
-    },
-  },
-  {
     name: 'request_expert_interview',
     description: 'Request to schedule interviews with specific experts. Sends notification to team with expert details and research topic. Use this when user wants to actually talk to or schedule time with experts.',
     inputSchema: {
@@ -1050,15 +1022,6 @@ app.post('/mcp', async (req, res) => {
             } else {
               throw new Error('Either expertId or expertName is required');
             }
-            break;
-          }
-          case 'synthesize_insights': {
-            const synthesisParams = {
-              query: args?.query,
-              minCredibilityScore: args?.minCredibilityScore || 7,
-              limit: args?.limit || 20,
-            };
-            result = await handleInterviewTool('synthesize_interviews', synthesisParams);
             break;
           }
           case 'request_expert_interview': {
